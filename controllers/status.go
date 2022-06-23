@@ -3,7 +3,7 @@ package controllers
 import (
 	"context"
 
-	clusterv1beta1 "github.com/AlexsJones/cluster-api-control-plane-provider-microk8s/api/v1beta1"
+	clusterv1beta1 "github.com/canonical/cluster-api-control-plane-provider-microk8s/api/v1beta1"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"

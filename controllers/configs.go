@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	bootstrapv1beta1 "github.com/AlexsJones/cluster-api-bootstrap-provider-microk8s/apis/v1beta1"
+	bootstrapv1beta1 "github.com/canonical/cluster-api-bootstrap-provider-microk8s/apis/v1beta1"
 
-	clusterv1beta1 "github.com/AlexsJones/cluster-api-control-plane-provider-microk8s/api/v1beta1"
+	clusterv1beta1 "github.com/canonical/cluster-api-control-plane-provider-microk8s/api/v1beta1"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"

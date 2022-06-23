@@ -24,10 +24,10 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
-	"github.com/AlexsJones/cluster-api-control-plane-provider-microk8s/api/v1beta1"
-	"github.com/AlexsJones/cluster-api-control-plane-provider-microk8s/controllers"
+	"github.com/canonical/cluster-api-control-plane-provider-microk8s/api/v1beta1"
+	"github.com/canonical/cluster-api-control-plane-provider-microk8s/controllers"
 
-	bootstrapv1beta1 "github.com/AlexsJones/cluster-api-bootstrap-provider-microk8s/apis/v1beta1"
+	bootstrapv1beta1 "github.com/canonical/cluster-api-bootstrap-provider-microk8s/apis/v1beta1"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"

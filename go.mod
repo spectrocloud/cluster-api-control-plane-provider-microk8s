@@ -1,9 +1,9 @@
-module github.com/AlexsJones/cluster-api-control-plane-provider-microk8s
+module github.com/canonical/cluster-api-control-plane-provider-microk8s
 
 go 1.17
 
 require (
-	github.com/AlexsJones/cluster-api-bootstrap-provider-microk8s v0.0.0-20220511083622-b3647739f72d
+	github.com/canonical/cluster-api-bootstrap-provider-microk8s v0.0.0-20220623210619-095aabaf87e5
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.19.0
 	github.com/sirupsen/logrus v1.8.1
@@ -13,8 +13,6 @@ require (
 	k8s.io/client-go v0.23.5
 	sigs.k8s.io/controller-runtime v0.11.2
 )
-
-replace github.com/AlexsJones/cluster-api-bootstrap-provider-microk8s => github.com/ktsakalozos/cluster-api-bootstrap-provider-microk8s v0.0.0-20220620194523-668a92209b50
 
 require (
 	github.com/blang/semver v3.5.1+incompatible // indirect
