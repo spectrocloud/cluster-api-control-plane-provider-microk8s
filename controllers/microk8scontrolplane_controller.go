@@ -172,8 +172,6 @@ func (r *MicroK8sControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl
 		return r.reconcileDelete(ctx, cluster, mcp)
 	}
 
-	//TODO: reconcile
-
 	return r.reconcile(ctx, cluster, mcp)
 }
 

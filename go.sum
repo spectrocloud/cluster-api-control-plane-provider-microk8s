@@ -109,8 +109,8 @@ github.com/bketelsen/crypt v0.0.3-0.20200106085610-5cbc8cc4026c/go.mod h1:MKsuJm
 github.com/bketelsen/crypt v0.0.4/go.mod h1:aI6NrJ0pMGgvZKL1iVgXLnfIFJtfV+bKCoqOes/6LfM=
 github.com/blang/semver v3.5.1+incompatible h1:cQNTCjp13qL8KC3Nbxr/y2Bqb63oX6wdnnjpJbkM4JQ=
 github.com/blang/semver v3.5.1+incompatible/go.mod h1:kRBLl5iJ+tD4TcOOxsy/0fnwebNt5EWlYSAyrTnjyyk=
-github.com/canonical/cluster-api-bootstrap-provider-microk8s v0.0.0-20220623210619-095aabaf87e5 h1:GpZZawLdLXbgq0WcvQtR3kERl23E1vcxC9VsDaBhM4s=
-github.com/canonical/cluster-api-bootstrap-provider-microk8s v0.0.0-20220623210619-095aabaf87e5/go.mod h1:rxAh8UqIXz+zUrQmKNZGwYH0kkTvHRn1MmOcc6RTaQM=
+github.com/canonical/cluster-api-bootstrap-provider-microk8s v0.0.0-20220702154407-5381e3ab77ea h1:AVAKhktkPXvpmDSRyv6sz6gAi5d21jjNiYkwFwOPhYk=
+github.com/canonical/cluster-api-bootstrap-provider-microk8s v0.0.0-20220702154407-5381e3ab77ea/go.mod h1:rxAh8UqIXz+zUrQmKNZGwYH0kkTvHRn1MmOcc6RTaQM=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=
 github.com/certifi/gocertifi v0.0.0-20191021191039-0944d244cd40/go.mod h1:sGbDF6GwGcLpkNXPUTkMRoywsNa/ol15pxFe6ERfguA=
 github.com/certifi/gocertifi v0.0.0-20200922220541-2c3bb06c6054/go.mod h1:sGbDF6GwGcLpkNXPUTkMRoywsNa/ol15pxFe6ERfguA=
