@@ -14,6 +14,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/storage/names"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
@@ -146,21 +148,15 @@ func (r *MicroK8sControlPlaneReconciler) reconcileMachines(ctx context.Context,
 			"Scaling down control plane to %d replicas (actual %d)",
 			desiredReplicas, numMachines)
 
-		if numMachines == 1 {
+		if numMachines < 4 {
 			conditions.MarkFalse(mcp, clusterv1beta1.ResizedCondition, clusterv1beta1.ScalingDownReason, clusterv1.ConditionSeverityError,
-				"Cannot scale down control plane nodes to 0")
+				"Cannot scale down control plane nodes to less than 3 nodes")
 
 			return res, nil
 		}
 
 		if err := r.ensureNodesBooted(ctx, controlPlane.MCP, cluster, machines); err != nil {
 			log.Info("waiting for all nodes to finish boot sequence", "error", err)
-
-			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
-		}
-
-		if !conditions.IsTrue(mcp, clusterv1beta1.EtcdClusterHealthyCondition) {
-			log.Info("waiting for etcd to become healthy before scaling down")
 
 			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 		}
@@ -258,6 +254,48 @@ func (r *MicroK8sControlPlaneReconciler) bootControlPlane(ctx context.Context, c
 	bootstrapConfig := &mcp.Spec.ControlPlaneConfig.ControlPlaneConfig
 	if !reflect.ValueOf(mcp.Spec.ControlPlaneConfig.InitConfig).IsZero() && first {
 		bootstrapConfig = &mcp.Spec.ControlPlaneConfig.InitConfig
+	}
+
+	// Get a node to join to in case this is not our first machine
+	if !first {
+		nodeSelector := labels.NewSelector()
+		req, err := labels.NewRequirement("node.kubernetes.io/microk8s-controlplane", selection.Exists, []string{})
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+
+		kubeclient, err := r.kubeconfigForCluster(ctx, util.ObjectKey(cluster))
+		if err != nil {
+			log.Info("failed to get kubeconfig for the cluster", " error ", err)
+			return ctrl.Result{}, err
+		}
+
+		defer kubeclient.Close() //nolint:errcheck
+
+		nodes, err := kubeclient.CoreV1().Nodes().List(ctx, metav1.ListOptions{
+			LabelSelector: nodeSelector.Add(*req).String(),
+		})
+
+		if err != nil {
+			log.Info("failed to list controlplane nodes", "error", err)
+
+			return ctrl.Result{}, err
+		}
+		// TODO: this is ugly and not in the right place. We need a better way to update the ProviderID
+		// in each node because MicroK8s is not doing that by default.
+		for _, node := range nodes.Items {
+			if util.IsNodeReady(&node) {
+				log.Info(node.Spec.ProviderID)
+				for _, address := range node.Status.Addresses {
+					if address.Type != "InternalIP" {
+						continue
+					}
+					bootstrapConfig.JoinConfiguration.IpOfNodeToConnectTo = address.Address
+					bootstrapConfig.JoinConfiguration.PortOfNodeToConnectTo = "25000"
+					// TODO update join token in bootstrapConfig.JoinConfiguration
+				}
+			}
+		}
 	}
 
 	// Clone the bootstrap configuration
@@ -410,8 +448,10 @@ func (r *MicroK8sControlPlaneReconciler) scaleDownControlPlane(ctx context.Conte
 
 	defer kubeclient.Close() //nolint:errcheck
 
-	deleteMachine := machines[0]
-	for _, machine := range machines {
+	deleteMachine := machines[len(machines)-1]
+	machine := machines[len(machines)-1]
+	for i := len(machines) - 1; i >= 0; i-- {
+		machine = machines[i]
 		if !machine.ObjectMeta.DeletionTimestamp.IsZero() {
 			log.Info("machine is in process of deletion", "machine", machine.Name)
 
@@ -425,6 +465,7 @@ func (r *MicroK8sControlPlaneReconciler) scaleDownControlPlane(ctx context.Conte
 				return ctrl.Result{RequeueAfter: 20 * time.Second}, err
 			}
 
+			// TODO: drain and cordon the node
 			log.Info("Deleting node", "machine", machine.Name, "node", node.Name)
 
 			err = kubeclient.CoreV1().Nodes().Delete(ctx, node.Name, metav1.DeleteOptions{})
