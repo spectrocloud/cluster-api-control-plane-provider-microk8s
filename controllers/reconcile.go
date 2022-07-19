@@ -291,7 +291,7 @@ func (r *MicroK8sControlPlaneReconciler) bootControlPlane(ctx context.Context, c
 						continue
 					}
 					bootstrapConfig.JoinConfiguration.IpOfNodeToConnectTo = address.Address
-					bootstrapConfig.JoinConfiguration.PortOfNodeToConnectTo = "25000"
+					bootstrapConfig.JoinConfiguration.PortOfNodeToConnectTo = "2379"
 					// TODO update join token in bootstrapConfig.JoinConfiguration
 				}
 			}
