@@ -219,8 +219,6 @@ func (r *MicroK8sControlPlaneReconciler) SetupWithManager(mgr ctrl.Manager, opti
 		Complete(r)
 }
 
-// ClusterToTalosControlPlane is a handler.ToRequestsFunc to be used to enqueue requests for reconciliation
-// for TalosControlPlane based on updates to a Cluster.
 func (r *MicroK8sControlPlaneReconciler) ClusterToMicroK8sControlPlane(o client.Object) []ctrl.Request {
 	c, ok := o.(*clusterv1.Cluster)
 	if !ok {
