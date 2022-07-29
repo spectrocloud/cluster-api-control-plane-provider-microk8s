@@ -3,7 +3,7 @@ module github.com/canonical/cluster-api-control-plane-provider-microk8s
 go 1.17
 
 require (
-	github.com/canonical/cluster-api-bootstrap-provider-microk8s v0.0.0-20220727135334-e195599e8f10
+	github.com/canonical/cluster-api-bootstrap-provider-microk8s v0.0.0-20220729090702-2f5f1382e8be
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.19.0
 	github.com/sirupsen/logrus v1.8.1
@@ -14,11 +14,13 @@ require (
 	sigs.k8s.io/controller-runtime v0.11.2
 )
 
-replace github.com/canonical/cluster-api-bootstrap-provider-microk8s => /home/jackal/workspace/go/src/github.com/canonical/cluster-api-bootstrap-provider-microk8s
-
 require (
 	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/gobuffalo/flect v0.2.4 // indirect
+	github.com/hashicorp/go-version v1.6.0 // indirect
+	github.com/inconshreveable/mousetrap v1.0.0 // indirect
+	github.com/spf13/cobra v1.2.1 // indirect
+	k8s.io/cluster-bootstrap v0.23.0 // indirect
 )
 
 require (
