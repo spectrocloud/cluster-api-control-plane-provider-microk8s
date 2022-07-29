@@ -7,12 +7,14 @@ import (
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/conditions"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func (r *MicroK8sControlPlaneReconciler) updateStatus(ctx context.Context,
@@ -59,6 +61,13 @@ func (r *MicroK8sControlPlaneReconciler) updateStatus(ctx context.Context,
 
 	defer kubeclient.Close() //nolint:errcheck
 
+	err = r.updateProviderID(ctx, util.ObjectKey(cluster), kubeclient)
+	if err != nil {
+		log.Info("failed to update provider ID of nodes", "error", err)
+
+		return nil
+	}
+
 	nodeSelector := labels.NewSelector()
 	req, err := labels.NewRequirement("node.kubernetes.io/microk8s-controlplane", selection.Exists, []string{})
 	if err != nil {
@@ -75,28 +84,8 @@ func (r *MicroK8sControlPlaneReconciler) updateStatus(ctx context.Context,
 		return nil
 	}
 
-	// TODO: this is ugly and not in the right place. We need a better way to update the ProviderID
-	// in each node because MicroK8s is not doing that by default.
 	for _, node := range nodes.Items {
 		if util.IsNodeReady(&node) {
-			log.Info(node.Spec.ProviderID)
-			if node.Spec.ProviderID == "" {
-				for _, address := range node.Status.Addresses {
-					for _, machine := range ownedMachines {
-						for _, maddress := range machine.Status.Addresses {
-							if maddress.Address == address.Address {
-								node.Spec.ProviderID = *machine.Spec.ProviderID
-								_, err := kubeclient.CoreV1().Nodes().Update(ctx, &node, metav1.UpdateOptions{})
-								if err != nil {
-									log.Info("failed to update node", " error ", err)
-									return nil
-								}
-							}
-						}
-					}
-				}
-			}
-
 			mcp.Status.ReadyReplicas++
 		}
 	}
@@ -114,5 +103,60 @@ func (r *MicroK8sControlPlaneReconciler) updateStatus(ctx context.Context,
 
 	log.Info("ready replicas", " count ", mcp.Status.ReadyReplicas)
 
+	return nil
+}
+
+func (r *MicroK8sControlPlaneReconciler) updateProviderID(ctx context.Context, cluster client.ObjectKey, kubeclient *kubernetesClient) error {
+
+	nodes, err := kubeclient.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+
+	if err != nil {
+		log.Info("failed to list nodes", "error", err)
+
+		return nil
+	}
+
+	selector := map[string]string{
+		clusterv1.ClusterLabelName: cluster.Name,
+	}
+
+	machineList := clusterv1.MachineList{}
+	if err := r.Client.List(
+		ctx,
+		&machineList,
+		client.InNamespace(cluster.Namespace),
+		client.MatchingLabels(selector),
+	); err != nil {
+		return err
+	}
+
+	for _, node := range nodes.Items {
+		if !util.IsNodeReady(&node) || node.Spec.ProviderID != "" {
+			continue
+		}
+		for _, address := range node.Status.Addresses {
+			machine := r.findMachineWithAddress(machineList.Items, &address)
+			if machine != nil {
+				node.Spec.ProviderID = *machine.Spec.ProviderID
+				_, err := kubeclient.CoreV1().Nodes().Update(ctx, &node, metav1.UpdateOptions{})
+				if err != nil {
+					log.Info("failed to update node", " error ", err)
+					return err
+				}
+				break
+			}
+		}
+	}
+	return nil
+}
+
+func (r *MicroK8sControlPlaneReconciler) findMachineWithAddress(machineList []clusterv1.Machine, address *v1.NodeAddress) *clusterv1.Machine {
+	for _, machine := range machineList {
+		for _, maddress := range machine.Status.Addresses {
+			if maddress.Address == address.Address {
+				return &machine
+			}
+		}
+	}
 	return nil
 }
