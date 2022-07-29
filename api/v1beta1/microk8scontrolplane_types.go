@@ -27,11 +27,6 @@ const (
 	MicroK8sControlPlaneFinalizer = "microk8s.controlplane.cluster.x-k8s.io"
 )
 
-type ControlPlaneConfig struct {
-	InitConfig         v1beta1.MicroK8sConfigSpec `json:"init,omitempty"`
-	ControlPlaneConfig v1beta1.MicroK8sConfigSpec `json:"controlplane"`
-}
-
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 type MachineTemplate struct {
@@ -57,7 +52,7 @@ type MicroK8sControlPlaneSpec struct {
 
 	// to use for initializing and joining machines to the control plane.
 	// +optional
-	ControlPlaneConfig ControlPlaneConfig `json:"controlPlaneConfig"`
+	ControlPlaneConfig v1beta1.MicroK8sConfigSpec `json:"controlPlaneConfig,omitempty"`
 }
 
 // MicroK8sControlPlaneStatus defines the observed state of MicroK8sControlPlane
@@ -108,7 +103,7 @@ type MicroK8sControlPlaneStatus struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// Conditions defines current service state of the KubeadmControlPlane.
+	// Conditions defines current service state of the MicroK8sControlPlane.
 	// +optional
 	Conditions clusterv1.Conditions `json:"conditions,omitempty"`
 }
