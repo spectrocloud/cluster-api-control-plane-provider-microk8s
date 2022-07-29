@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"reflect"
 	"time"
 
 	clusterv1beta1 "github.com/canonical/cluster-api-control-plane-provider-microk8s/api/v1beta1"
@@ -14,8 +13,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/selection"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/storage/names"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
@@ -174,11 +171,6 @@ func (r *MicroK8sControlPlaneReconciler) reconcileMachines(ctx context.Context,
 
 		return res, err
 	default:
-		if !reflect.ValueOf(mcp.Spec.ControlPlaneConfig.InitConfig).IsZero() {
-			mcp.Status.Bootstrapped = true
-			conditions.MarkTrue(mcp, clusterv1beta1.MachinesBootstrapped)
-		}
-
 		if !mcp.Status.Bootstrapped {
 			if err := r.bootstrapCluster(ctx, mcp, cluster, machines); err != nil {
 				conditions.MarkFalse(mcp, clusterv1beta1.MachinesBootstrapped, clusterv1beta1.WaitingForMicroK8sBootReason, clusterv1.ConditionSeverityInfo, err.Error())
@@ -251,52 +243,7 @@ func (r *MicroK8sControlPlaneReconciler) bootControlPlane(ctx context.Context, c
 		return ctrl.Result{}, err
 	}
 
-	bootstrapConfig := &mcp.Spec.ControlPlaneConfig.ControlPlaneConfig
-	if !reflect.ValueOf(mcp.Spec.ControlPlaneConfig.InitConfig).IsZero() && first {
-		bootstrapConfig = &mcp.Spec.ControlPlaneConfig.InitConfig
-	}
-
-	// Get a node to join to in case this is not our first machine
-	if !first {
-		nodeSelector := labels.NewSelector()
-		req, err := labels.NewRequirement("node.kubernetes.io/microk8s-controlplane", selection.Exists, []string{})
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-
-		kubeclient, err := r.kubeconfigForCluster(ctx, util.ObjectKey(cluster))
-		if err != nil {
-			log.Info("failed to get kubeconfig for the cluster", " error ", err)
-			return ctrl.Result{}, err
-		}
-
-		defer kubeclient.Close() //nolint:errcheck
-
-		nodes, err := kubeclient.CoreV1().Nodes().List(ctx, metav1.ListOptions{
-			LabelSelector: nodeSelector.Add(*req).String(),
-		})
-
-		if err != nil {
-			log.Info("failed to list controlplane nodes", "error", err)
-
-			return ctrl.Result{}, err
-		}
-		// TODO: this is ugly and not in the right place. We need a better way to update the ProviderID
-		// in each node because MicroK8s is not doing that by default.
-		for _, node := range nodes.Items {
-			if util.IsNodeReady(&node) {
-				log.Info(node.Spec.ProviderID)
-				for _, address := range node.Status.Addresses {
-					if address.Type != "InternalIP" {
-						continue
-					}
-					bootstrapConfig.JoinConfiguration.IpOfNodeToConnectTo = address.Address
-					bootstrapConfig.JoinConfiguration.PortOfNodeToConnectTo = "2379"
-					// TODO update join token in bootstrapConfig.JoinConfiguration
-				}
-			}
-		}
-	}
+	bootstrapConfig := &mcp.Spec.ControlPlaneConfig
 
 	// Clone the bootstrap configuration
 	bootstrapRef, err := r.generateMicroK8sConfig(ctx, mcp, cluster, bootstrapConfig)
