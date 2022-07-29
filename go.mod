@@ -14,6 +14,8 @@ require (
 	sigs.k8s.io/controller-runtime v0.11.2
 )
 
+replace github.com/canonical/cluster-api-bootstrap-provider-microk8s => /home/jackal/workspace/go/src/github.com/canonical/cluster-api-bootstrap-provider-microk8s
+
 require (
 	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/gobuffalo/flect v0.2.4 // indirect
