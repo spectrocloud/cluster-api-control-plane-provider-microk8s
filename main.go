@@ -77,7 +77,7 @@ func main() {
 		Port:                   9443,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "43109c0a.cluster.x-k8s.io",
+		LeaderElectionID:       "microk8s-control-plane-manager-leader-election-capi",
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
