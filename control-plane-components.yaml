@@ -750,7 +750,7 @@ spec:
         - --leader-elect
         command:
         - /manager
-        image: capi-control-plane-provider-microk8s:latest
+        image: cdkbot/capi-control-plane-provider-microk8s:latest
         livenessProbe:
           httpGet:
             path: /healthz
