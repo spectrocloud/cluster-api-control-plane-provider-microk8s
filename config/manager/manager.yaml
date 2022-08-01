@@ -31,7 +31,7 @@ spec:
         - /manager
         args:
         - --leader-elect
-        image: cdkbot/capi-control-plane-provider-microk8s:latest
+        image: docker.io/cdkbot/capi-control-plane-provider-microk8s:latest
         name: manager
         securityContext:
           allowPrivilegeEscalation: false

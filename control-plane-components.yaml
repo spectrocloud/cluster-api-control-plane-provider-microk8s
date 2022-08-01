@@ -464,13 +464,13 @@ status:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: cluster-api-control-plane-provider-microk8s-controller-manager
+  name: capi-cp-provider-microk8s-controller-manager
   namespace: cluster-api-control-plane-provider-microk8s-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: cluster-api-control-plane-provider-microk8s-leader-election-role
+  name: capi-cp-provider-microk8s-leader-election-role
   namespace: cluster-api-control-plane-provider-microk8s-system
 rules:
 - apiGroups:
@@ -509,7 +509,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   creationTimestamp: null
-  name: cluster-api-control-plane-provider-microk8s-manager-role
+  name: capi-cp-provider-microk8s-manager-role
   namespace: cluster-api-control-plane-provider-microk8s-system
 rules:
 - apiGroups:
@@ -544,7 +544,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   creationTimestamp: null
-  name: cluster-api-control-plane-provider-microk8s-manager-role
+  name: capi-cp-provider-microk8s-manager-role
 rules:
 - apiGroups:
   - bootstrap.cluster.x-k8s.io
@@ -606,7 +606,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: cluster-api-control-plane-provider-microk8s-metrics-reader
+  name: capi-cp-provider-microk8s-metrics-reader
 rules:
 - nonResourceURLs:
   - /metrics
@@ -616,7 +616,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: cluster-api-control-plane-provider-microk8s-proxy-role
+  name: capi-cp-provider-microk8s-proxy-role
 rules:
 - apiGroups:
   - authentication.k8s.io
@@ -634,41 +634,41 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: cluster-api-control-plane-provider-microk8s-leader-election-rolebinding
+  name: capi-cp-provider-microk8s-leader-election-rolebinding
   namespace: cluster-api-control-plane-provider-microk8s-system
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: cluster-api-control-plane-provider-microk8s-leader-election-role
+  name: capi-cp-provider-microk8s-leader-election-role
 subjects:
 - kind: ServiceAccount
-  name: cluster-api-control-plane-provider-microk8s-controller-manager
+  name: capi-cp-provider-microk8s-controller-manager
   namespace: cluster-api-control-plane-provider-microk8s-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: cluster-api-control-plane-provider-microk8s-manager-rolebinding
+  name: capi-cp-provider-microk8s-manager-rolebinding
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: cluster-api-control-plane-provider-microk8s-manager-role
+  name: capi-cp-provider-microk8s-manager-role
 subjects:
 - kind: ServiceAccount
-  name: cluster-api-control-plane-provider-microk8s-controller-manager
+  name: capi-cp-provider-microk8s-controller-manager
   namespace: cluster-api-control-plane-provider-microk8s-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: cluster-api-control-plane-provider-microk8s-proxy-rolebinding
+  name: capi-cp-provider-microk8s-proxy-rolebinding
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: cluster-api-control-plane-provider-microk8s-proxy-role
+  name: capi-cp-provider-microk8s-proxy-role
 subjects:
 - kind: ServiceAccount
-  name: cluster-api-control-plane-provider-microk8s-controller-manager
+  name: capi-cp-provider-microk8s-controller-manager
   namespace: cluster-api-control-plane-provider-microk8s-system
 ---
 apiVersion: v1
@@ -687,7 +687,7 @@ data:
       resourceName: 43109c0a.cluster.x-k8s.io
 kind: ConfigMap
 metadata:
-  name: cluster-api-control-plane-provider-microk8s-manager-config
+  name: capi-cp-provider-microk8s-manager-config
   namespace: cluster-api-control-plane-provider-microk8s-system
 ---
 apiVersion: v1
@@ -695,7 +695,7 @@ kind: Service
 metadata:
   labels:
     control-plane: controller-manager
-  name: cluster-api-control-plane-provider-microk8s-controller-manager-metrics-service
+  name: capi-cp-provider-microk8s-controller-manager-metrics-service
   namespace: cluster-api-control-plane-provider-microk8s-system
 spec:
   ports:
@@ -711,7 +711,7 @@ kind: Deployment
 metadata:
   labels:
     control-plane: controller-manager
-  name: cluster-api-control-plane-provider-microk8s-controller-manager
+  name: capi-cp-provider-microk8s-controller-manager
   namespace: cluster-api-control-plane-provider-microk8s-system
 spec:
   replicas: 1
@@ -750,7 +750,7 @@ spec:
         - --leader-elect
         command:
         - /manager
-        image: cdkbot/capi-control-plane-provider-microk8s:latest
+        image: docker.io/cdkbot/capi-control-plane-provider-microk8s:latest
         livenessProbe:
           httpGet:
             path: /healthz
@@ -775,5 +775,5 @@ spec:
           allowPrivilegeEscalation: false
       securityContext:
         runAsNonRoot: true
-      serviceAccountName: cluster-api-control-plane-provider-microk8s-controller-manager
+      serviceAccountName: capi-cp-provider-microk8s-controller-manager
       terminationGracePeriodSeconds: 10
