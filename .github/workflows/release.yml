@@ -1,0 +1,32 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+'
+
+jobs:
+  build:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Retrieve build information
+        id: build
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/}"
+          echo "Releasing ${VERSION}"
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          sed -i "s,docker.io/cdkbot/capi-control-plane-provider-microk8s:latest,cdkbot/capi-control-plane-provider-microk8s:${VERSION//v}," control-plane-components.yaml
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v0.1.14
+        with:
+          name: 'Release ${{ env.VERSION }}'
+          files: |
+            control-plane-components.yaml
+            metadata.yaml
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(env.VERSION, 'rc') }}
