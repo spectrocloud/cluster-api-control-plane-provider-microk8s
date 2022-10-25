@@ -223,7 +223,7 @@ func (r *MicroK8sControlPlaneReconciler) SetupWithManager(mgr ctrl.Manager, opti
 func (r *MicroK8sControlPlaneReconciler) ClusterToMicroK8sControlPlane(o client.Object) []ctrl.Request {
 	c, ok := o.(*clusterv1.Cluster)
 	if !ok {
-		fmt.Println(fmt.Sprintf("expected a Cluster but got a %T", o))
+		fmt.Printf("expected a Cluster but got a %T\n", o)
 		return nil
 	}
 

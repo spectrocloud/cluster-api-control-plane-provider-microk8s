@@ -94,6 +94,10 @@ docker-manifest: docker-push ## Push docker multi-arch manifest.
 	docker manifest annotate ${IMG} ${IMG}-arm64 --arch=arm64
 	docker manifest push ${IMG}
 
+.PHONY: lint
+lint: golangci-lint ## Lint the codebase
+	$(GOLANGCI_LINT) run -v --go=1.19 --timeout 3m0s
+
 ##@ Deployment
 
 ifndef ignore-not-found
@@ -116,6 +120,11 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 .PHONY: undeploy
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	$(KUSTOMIZE) build config/default | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
+
+GOLANGCI_LINT = $(shell pwd)/bin/golangci-lint
+.PHONY: golangci-lint
+golangci-lint: ## Download golangci-lint locally if necessary.
+	$(call go-get-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/cmd/golangci-lint@v1.50.1)
 
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
 .PHONY: controller-gen
