@@ -65,8 +65,7 @@ test: manifests generate fmt vet envtest ## Run tests.
 
 .PHONY: component
 component: manifests kustomize ## Produce the control-plane-components.yaml.
-	$(KUSTOMIZE) build config/crd/ > $(COMPSFILE)
-	echo "---" >> $(COMPSFILE)
+	echo "---" > $(COMPSFILE)
 	$(KUSTOMIZE) build config/default/ >> $(COMPSFILE)
 
 .PHONY: build
@@ -143,6 +142,7 @@ cd $$TMP_DIR ;\
 go mod init tmp ;\
 echo "Downloading $(2)" ;\
 GOBIN=$(PROJECT_DIR)/bin go get $(2) ;\
+GOBIN=$(PROJECT_DIR)/bin go install $(2) ;\
 rm -rf $$TMP_DIR ;\
 }
 endef
