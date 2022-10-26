@@ -352,7 +352,7 @@ func (r *MicroK8sControlPlaneReconciler) reconcileDelete(ctx context.Context, cl
 			},
 		}
 		if err := r.Client.Delete(ctx, secret); err != nil && !apierrors.IsNotFound(err) {
-			log.WithField("secret", secret.Name).WithError(err).Warn("Failed to delete secret")
+			log.FromContext(ctx).Error(err, "failed to delete secret", "secret", secret.Name)
 		}
 	}
 
