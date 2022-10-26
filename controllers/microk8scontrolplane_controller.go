@@ -105,6 +105,8 @@ func (r *MicroK8sControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl
 	}
 	logger = logger.WithValues("cluster", cluster.Name)
 
+	ctx = log.IntoContext(ctx, logger)
+
 	if annotations.IsPaused(cluster, mcp) {
 		logger.Info("reconciliation is paused for this object")
 		return ctrl.Result{Requeue: true}, nil
@@ -235,8 +237,7 @@ func (r *MicroK8sControlPlaneReconciler) ClusterToMicroK8sControlPlane(o client.
 	return nil
 }
 
-func (r *MicroK8sControlPlaneReconciler) getControlPlaneMachinesForCluster(ctx context.Context,
-	cluster client.ObjectKey, cpName string) ([]clusterv1.Machine, error) {
+func (r *MicroK8sControlPlaneReconciler) getControlPlaneMachinesForCluster(ctx context.Context, cluster client.ObjectKey, cpName string) ([]clusterv1.Machine, error) {
 	selector := map[string]string{
 		clusterv1.ClusterLabelName:             cluster.Name,
 		clusterv1.MachineControlPlaneLabelName: "",
@@ -255,8 +256,7 @@ func (r *MicroK8sControlPlaneReconciler) getControlPlaneMachinesForCluster(ctx c
 	return machineList.Items, nil
 }
 
-func (r *MicroK8sControlPlaneReconciler) newControlPlane(cluster *clusterv1.Cluster, mcp *clusterv1beta1.MicroK8sControlPlane,
-	machines []clusterv1.Machine) *ControlPlane {
+func (r *MicroK8sControlPlaneReconciler) newControlPlane(cluster *clusterv1.Cluster, mcp *clusterv1beta1.MicroK8sControlPlane, machines []clusterv1.Machine) *ControlPlane {
 	return &ControlPlane{
 		MCP:      mcp,
 		Cluster:  cluster,
