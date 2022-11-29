@@ -20,12 +20,12 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - description: TalosControlPlane API Server is ready to receive requests
+    - description: MicroK8sControlPlane API Server is ready to receive requests
       jsonPath: .status.ready
       name: Ready
       type: boolean
     - description: This denotes whether or not the control plane has the uploaded
-        talos-config configmap
+        microk8s-config configmap
       jsonPath: .status.initialized
       name: Initialized
       type: boolean
@@ -245,7 +245,7 @@ spec:
               bootstrapped:
                 description: Bootstrapped denotes whether any nodes received bootstrap
                   request which is required to start etcd and Kubernetes components
-                  in Talos.
+                  in MicroK8s.
                 type: boolean
               conditions:
                 description: Conditions defines current service state of the MicroK8sControlPlane.
@@ -294,7 +294,7 @@ spec:
                 type: array
               initialized:
                 description: Initialized denotes whether or not the control plane
-                  has the uploaded talos-config configmap.
+                  has the uploaded microk8s-config configmap.
                 type: boolean
               observedGeneration:
                 description: ObservedGeneration is the latest generation observed
@@ -302,8 +302,8 @@ spec:
                 format: int64
                 type: integer
               ready:
-                description: Ready denotes that the TalosControlPlane API Server is
-                  ready to receive requests.
+                description: Ready denotes that the MicroK8sControlPlane API Server
+                  is ready to receive requests.
                 type: boolean
               readyReplicas:
                 description: Total number of fully running and ready control plane

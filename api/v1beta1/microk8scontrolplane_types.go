@@ -85,17 +85,17 @@ type MicroK8sControlPlaneStatus struct {
 	UnavailableReplicas int32 `json:"unavailableReplicas,omitempty"`
 
 	// Initialized denotes whether or not the control plane has the
-	// uploaded talos-config configmap.
+	// uploaded microk8s-config configmap.
 	// +optional
 	Initialized bool `json:"initialized"`
 
-	// Ready denotes that the TalosControlPlane API Server is ready to
+	// Ready denotes that the MicroK8sControlPlane API Server is ready to
 	// receive requests.
 	// +optional
 	Ready bool `json:"ready"`
 
 	// Bootstrapped denotes whether any nodes received bootstrap request
-	// which is required to start etcd and Kubernetes components in Talos.
+	// which is required to start etcd and Kubernetes components in MicroK8s.
 	// +optional
 	Bootstrapped bool `json:"bootstrapped,omitempty"`
 
@@ -113,8 +113,8 @@ type MicroK8sControlPlaneStatus struct {
 // +kubebuilder:storageversion
 // +kubebuilder:subresource:status
 // +kubebuilder:subresource:scale:specpath=.spec.replicas,statuspath=.status.replicas,selectorpath=.status.selector
-// +kubebuilder:printcolumn:name="Ready",type=boolean,JSONPath=".status.ready",description="TalosControlPlane API Server is ready to receive requests"
-// +kubebuilder:printcolumn:name="Initialized",type=boolean,JSONPath=".status.initialized",description="This denotes whether or not the control plane has the uploaded talos-config configmap"
+// +kubebuilder:printcolumn:name="Ready",type=boolean,JSONPath=".status.ready",description="MicroK8sControlPlane API Server is ready to receive requests"
+// +kubebuilder:printcolumn:name="Initialized",type=boolean,JSONPath=".status.initialized",description="This denotes whether or not the control plane has the uploaded microk8s-config configmap"
 // +kubebuilder:printcolumn:name="Replicas",type=integer,JSONPath=".status.replicas",description="Total number of non-terminated machines targeted by this control plane"
 // +kubebuilder:printcolumn:name="Ready Replicas",type=integer,JSONPath=".status.readyReplicas",description="Total number of fully running and ready control plane machines"
 // +kubebuilder:printcolumn:name="Unavailable Replicas",type=integer,JSONPath=".status.unavailableReplicas",description="Total number of unavailable machines targeted by this control plane"

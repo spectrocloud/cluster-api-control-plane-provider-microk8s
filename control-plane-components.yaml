@@ -30,11 +30,11 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - description: TalosControlPlane API Server is ready to receive requests
+    - description: MicroK8sControlPlane API Server is ready to receive requests
       jsonPath: .status.ready
       name: Ready
       type: boolean
-    - description: This denotes whether or not the control plane has the uploaded talos-config configmap
+    - description: This denotes whether or not the control plane has the uploaded microk8s-config configmap
       jsonPath: .status.initialized
       name: Initialized
       type: boolean
@@ -208,7 +208,7 @@ spec:
             description: MicroK8sControlPlaneStatus defines the observed state of MicroK8sControlPlane
             properties:
               bootstrapped:
-                description: Bootstrapped denotes whether any nodes received bootstrap request which is required to start etcd and Kubernetes components in Talos.
+                description: Bootstrapped denotes whether any nodes received bootstrap request which is required to start etcd and Kubernetes components in MicroK8s.
                 type: boolean
               conditions:
                 description: Conditions defines current service state of the MicroK8sControlPlane.
@@ -241,14 +241,14 @@ spec:
                   type: object
                 type: array
               initialized:
-                description: Initialized denotes whether or not the control plane has the uploaded talos-config configmap.
+                description: Initialized denotes whether or not the control plane has the uploaded microk8s-config configmap.
                 type: boolean
               observedGeneration:
                 description: ObservedGeneration is the latest generation observed by the controller.
                 format: int64
                 type: integer
               ready:
-                description: Ready denotes that the TalosControlPlane API Server is ready to receive requests.
+                description: Ready denotes that the MicroK8sControlPlane API Server is ready to receive requests.
                 type: boolean
               readyReplicas:
                 description: Total number of fully running and ready control plane machines.
