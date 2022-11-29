@@ -10,7 +10,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.8.0
+    controller-gen.kubebuilder.io/version: v0.10.0
   creationTimestamp: null
   labels:
     cluster.x-k8s.io/provider: control-plane-microk8s
@@ -96,6 +96,41 @@ spec:
                       apiVersion:
                         description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
                         type: string
+                      confinement:
+                        description: The confinement (strict or classic) configuration
+                        enum:
+                        - classic
+                        - strict
+                        type: string
+                      extraKubeletArgs:
+                        description: ExtraKubeletArgs is a list of extra arguments to add to the kubelet.
+                        items:
+                          type: string
+                        type: array
+                      extraWriteFiles:
+                        description: ExtraWriteFiles is a list of extra files to inject with cloud-init.
+                        items:
+                          description: CloudInitWriteFile is a file that will be injected by cloud-init
+                          properties:
+                            content:
+                              description: Content of the file to create.
+                              type: string
+                            owner:
+                              description: Owner of the file to create, e.g. "root:root"
+                              type: string
+                            path:
+                              description: Path where the file should be created.
+                              type: string
+                            permissions:
+                              description: Permissions of the file to create, e.g. "0600"
+                              type: string
+                          required:
+                          - content
+                          - owner
+                          - path
+                          - permissions
+                          type: object
+                        type: array
                       httpProxy:
                         description: The optional http proxy configuration
                         type: string
@@ -113,6 +148,15 @@ spec:
                         type: string
                       noProxy:
                         description: The optional no proxy configuration
+                        type: string
+                      riskLevel:
+                        default: stable
+                        description: The risk-level (stable, candidate, beta, or edge) for the snaps
+                        enum:
+                        - stable
+                        - candidate
+                        - beta
+                        - edge
                         type: string
                     type: object
                 type: object
@@ -144,6 +188,7 @@ spec:
                         description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
                         type: string
                     type: object
+                    x-kubernetes-map-type: atomic
                 required:
                 - infrastructureTemplate
                 type: object
@@ -230,12 +275,6 @@ spec:
         specReplicasPath: .spec.replicas
         statusReplicasPath: .status.replicas
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []
 ---
 apiVersion: v1
 kind: ServiceAccount
