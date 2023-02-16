@@ -1,6 +1,6 @@
 
 # Image URL to use all building/pushing image targets
-IMG ?= cdkbot/capi-control-plane-provider-microk8s:latest
+IMG ?= gcr.io/spectro-dev-public/microk8s/capi-control-plane-provider-microk8s:20221207
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.23
 # Components file to be used by clusterctl
@@ -80,12 +80,12 @@ run: manifests generate fmt vet ## Run a controller from your host.
 .PHONY: docker-build
 docker-build-%: ## Build docker image with the manager.
 	docker build -t ${IMG}-$* . --build-arg arch=$*
-docker-build: docker-build-amd64 docker-build-arm64
+docker-build: docker-build-amd64
 
 .PHONY: docker-push
 docker-push-%: docker-build-% ## Push docker image with the manager.
 	docker push ${IMG}-$*
-docker-push: docker-push-amd64 docker-push-arm64
+docker-push: docker-push-amd64
 
 .PHONY: docker-manifest
 docker-manifest: docker-push ## Push docker multi-arch manifest.

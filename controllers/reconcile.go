@@ -145,7 +145,7 @@ func (r *MicroK8sControlPlaneReconciler) reconcileMachines(ctx context.Context,
 			"Scaling down control plane to %d replicas (actual %d)",
 			desiredReplicas, numMachines)
 
-		if numMachines < 4 {
+		if numMachines < 4 && desiredReplicas == 3 {
 			conditions.MarkFalse(mcp, clusterv1beta1.ResizedCondition, clusterv1beta1.ScalingDownReason, clusterv1.ConditionSeverityError,
 				"Cannot scale down control plane nodes to less than 3 nodes")
 
