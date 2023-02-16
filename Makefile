@@ -3,12 +3,7 @@ ALL_ARCH = amd64 arm64
 SPECTRO_VERSION ?= 4.1.0-dev
 TAG ?= v0.4.0-spectro-${SPECTRO_VERSION}
 # Image URL to use all building/pushing image targets
-REGISTRY ?= gcr.io/spectro-dev-public/$(USER)/capi-control-plane-provider-microk8s
-IMG ?= ${REGISTRY}:${TAG}
-
-BUILDER_GOLANG_VERSION ?= 1.21
-BUILD_ARGS = --build-arg CRYPTO_LIB=${FIPS_ENABLE} --build-arg BUILDER_GOLANG_VERSION=${BUILDER_GOLANG_VERSION}
-
+IMG ?= gcr.io/spectro-dev-public/microk8s/capi-control-plane-provider-microk8s:20221207
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.23
 # Components file to be used by clusterctl
@@ -84,29 +79,15 @@ build: generate fmt vet ## Build manager binary.
 run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
 
-## Docker build
-
-docker-build-%: ## Build docker images for a given ARCH
-	$(MAKE) ARCH=$* docker-build
-
-.PHONY: docker-build-all ## Build all the architecture docker images
-docker-build-all: $(addprefix docker-build-,$(ALL_ARCH))
-
-docker-build:  ## Build docker image with the manager.
-	DOCKER_BUILDKIT=1 docker buildx build --load --platform linux/${ARCH} ${BUILD_ARGS} --build-arg ARCH=$(ARCH) -t $(REGISTRY)-$(ARCH):$(TAG) .
-
-## Docker push
-
-.PHONY: docker-push-all ## Push all the architecture docker images
-docker-push-all: $(addprefix docker-push-,$(ALL_ARCH))
-	$(MAKE) docker-push-manifest
+.PHONY: docker-build
+docker-build-%: ## Build docker image with the manager.
+	docker build -t ${IMG}-$* . --build-arg arch=$*
+docker-build: docker-build-amd64
 
 .PHONY: docker-push
-docker-push: ## Push the docker image
-	docker push $(REGISTRY)-$(ARCH):$(TAG)
-
-docker-push-%:
-	$(MAKE) ARCH=$* docker-push
+docker-push-%: docker-build-% ## Push docker image with the manager.
+	docker push ${IMG}-$*
+docker-push: docker-push-amd64
 
 .PHONY: docker-push-manifest
 docker-push-manifest: ## Push the fat manifest docker image.
