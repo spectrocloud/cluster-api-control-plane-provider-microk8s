@@ -1,6 +1,6 @@
 module github.com/canonical/cluster-api-control-plane-provider-microk8s
 
-go 1.19
+go 1.20
 
 require (
 	github.com/canonical/cluster-api-bootstrap-provider-microk8s v0.0.0-20221011142754-738039c7e69e
