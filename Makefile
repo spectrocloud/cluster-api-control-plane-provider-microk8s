@@ -11,7 +11,7 @@ endif
 
 SPECTRO_VERSION ?= 4.0.0-dev
 
-
+REGISTRY ?= gcr.io/spectro-dev-public/microk8s/${RELEASE_LOC}/cluster-api
 TAG ?= v1.11.0-spectro-${SPECTRO_VERSION}
 IMG ?= gcr.io/spectro-dev-public/microk8s/${RELEASE_LOC}/capi-control-plane-provider-microk8s:${TAG}
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
