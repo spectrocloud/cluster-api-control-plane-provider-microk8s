@@ -2,7 +2,8 @@
 FROM golang:1.19.8 as builder
 
 ARG arch
-
+ARG CRYPTO_LIB
+ENV GOEXPERIMENT=${CRYPTO_LIB:+boringcrypto}
 WORKDIR /workspace
 # Copy the Go Modules manifests
 COPY go.mod go.mod
@@ -17,8 +18,13 @@ COPY api/ api/
 COPY controllers/ controllers/
 
 # Build
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -a -ldflags '-s -w' -o manager main.go
 
+RUN if [ ${CRYPTO_LIB} ]; \
+    then \
+      CGO_ENABLED=1 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -ldflags "-linkmode=external -extldflags=-static"  -o manager main.go ;\
+    else \
+      CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -a -ldflags '-s -w' -o manager main.go ;\
+    fi 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 FROM gcr.io/distroless/static:nonroot

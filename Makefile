@@ -1,6 +1,19 @@
 
 # Image URL to use all building/pushing image targets
-IMG ?= gcr.io/spectro-dev-public/microk8s/capi-control-plane-provider-microk8s:20221207
+
+
+FIPS_ENABLE ?= ""
+
+RELEASE_LOC := release
+ifeq ($(FIPS_ENABLE),yes)
+  RELEASE_LOC := release-fips
+endif
+
+SPECTRO_VERSION ?= 4.0.0-dev
+
+REGISTRY ?= gcr.io/spectro-dev-public/microk8s/${RELEASE_LOC}/cluster-api
+TAG ?= v1.11.0-spectro-${SPECTRO_VERSION}
+IMG ?= gcr.io/spectro-dev-public/microk8s/${RELEASE_LOC}/capi-control-plane-provider-microk8s:${TAG}
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.23
 # Components file to be used by clusterctl
