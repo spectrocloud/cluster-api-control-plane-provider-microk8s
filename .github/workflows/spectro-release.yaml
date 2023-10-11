@@ -41,7 +41,7 @@ jobs:
       -
         name: Build Image
         env:
-          REGISTRY: gcr.io/spectro-images-public/release/cluster-api/capi-bootstrap-provider-microk8s
+          REGISTRY: gcr.io/spectro-images-public/release/cluster-api/capi-control-plane-provider-microk8s
         run: |
           make docker-build-all
           make docker-push-all
