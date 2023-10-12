@@ -1,6 +1,6 @@
 module github.com/canonical/cluster-api-control-plane-provider-microk8s
 
-go 1.19
+go 1.21
 
 require (
 	github.com/canonical/cluster-api-bootstrap-provider-microk8s v0.0.0-20221011142754-738039c7e69e
@@ -70,7 +70,7 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
+	gopkg.in/yaml.v3 v3.0.0-20220521103104-8f96da9f5d5e // indirect
 	k8s.io/apiextensions-apiserver v0.23.5 // indirect
 	k8s.io/component-base v0.23.5 // indirect
 	k8s.io/klog/v2 v2.60.1 // indirect
