@@ -1,5 +1,5 @@
 # Build the manager binary
-FROM golang:1.19.8 as builder
+FROM gcr.io/spectro-images-public/golang:1.21-alpine as builder
 
 ARG arch
 
