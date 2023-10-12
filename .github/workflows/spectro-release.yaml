@@ -43,8 +43,8 @@ jobs:
         env:
           REGISTRY: gcr.io/spectro-images-public/release/cluster-api/capi-control-plane-provider-microk8s
         run: |
-          make docker-build-all
-          make docker-push-all
+          make docker-build
+          make docker-manifest
       -
         name: Create Release
         id: create_release
