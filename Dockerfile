@@ -1,9 +1,19 @@
-# Build the manager binary
-FROM gcr.io/spectro-images-public/golang:1.21-alpine as builder
+ARG BUILDER_GOLANG_VERSION
+# First stage: build the executable.
+FROM --platform=$TARGETPLATFORM gcr.io/spectro-images-public/golang:${BUILDER_GOLANG_VERSION}-alpine as toolchain
+# Run this with docker build --build_arg $(go env GOPROXY) to override the goproxy
+ARG goproxy=https://proxy.golang.org
+ENV GOPROXY=$goproxy
 
-ARG arch
+# FIPS
+ARG CRYPTO_LIB
+ENV GOEXPERIMENT=${CRYPTO_LIB:+boringcrypto}
 
+FROM toolchain as builder
 WORKDIR /workspace
+
+RUN apk update
+
 # Copy the Go Modules manifests
 COPY go.mod go.mod
 COPY go.sum go.sum
@@ -18,7 +28,17 @@ COPY controllers/ controllers/
 COPY pkg/ pkg/
 
 # Build
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -a -ldflags '-s -w' -o manager main.go
+ARG ARCH
+ARG ldflags
+RUN if [ ${CRYPTO_LIB} ]; \
+    then \
+      GOARCH=${ARCH} go-build-fips.sh -a -o manager main.go;\
+    else \
+      GOARCH=${ARCH} go-build-static.sh -a -o manager main.go;\
+    fi
+RUN if [ "${CRYPTO_LIB}" ]; then assert-static.sh manager; fi
+RUN if [ "${CRYPTO_LIB}" ]; then assert-fips.sh manager; fi
+RUN scan-govulncheck.sh manager
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
