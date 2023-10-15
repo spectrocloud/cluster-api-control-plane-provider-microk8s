@@ -1,8 +1,15 @@
-# Build the manager binary
-FROM gcr.io/spectro-images-public/golang:1.21-alpine as builder
+ARG BUILDER_GOLANG_VERSION
+# First stage: build the executable.
+FROM --platform=$TARGETPLATFORM gcr.io/spectro-images-public/golang:${BUILDER_GOLANG_VERSION}-alpine as toolchain
+# Run this with docker build --build_arg $(go env GOPROXY) to override the goproxy
+ARG goproxy=https://proxy.golang.org
+ENV GOPROXY=$goproxy
 
-ARG arch
+# FIPS
+ARG CRYPTO_LIB
+ENV GOEXPERIMENT=${CRYPTO_LIB:+boringcrypto}
 
+FROM toolchain as builder
 WORKDIR /workspace
 
 RUN apk update
