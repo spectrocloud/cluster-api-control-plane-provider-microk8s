@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"sort"
+	"strings"
 	"time"
 
 	clusterv1beta1 "github.com/canonical/cluster-api-control-plane-provider-microk8s/api/v1beta1"
+	"golang.org/x/mod/semver"
 
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,6 +25,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type errServiceUnhealthy struct {
@@ -34,9 +37,10 @@ func (e *errServiceUnhealthy) Error() string {
 	return fmt.Sprintf("Service %s is unhealthy: %s", e.service, e.reason)
 }
 
-func (r *MicroK8sControlPlaneReconciler) reconcile(ctx context.Context,
-	cluster *clusterv1.Cluster, tcp *clusterv1beta1.MicroK8sControlPlane) (res ctrl.Result, err error) {
-	log.Info("reconcile MicroK8sControlPlane")
+func (r *MicroK8sControlPlaneReconciler) reconcile(ctx context.Context, cluster *clusterv1.Cluster, tcp *clusterv1beta1.MicroK8sControlPlane) (res ctrl.Result, err error) {
+	logger := log.FromContext(ctx)
+
+	logger.Info("reconcile MicroK8sControlPlane")
 
 	// Update ownerrefs on infra templates
 	if err := r.reconcileExternalReference(ctx, tcp.Spec.InfrastructureTemplate, cluster); err != nil {
@@ -45,14 +49,14 @@ func (r *MicroK8sControlPlaneReconciler) reconcile(ctx context.Context,
 
 	// If ControlPlaneEndpoint is not set, return early
 	if !cluster.Spec.ControlPlaneEndpoint.IsValid() {
-		log.Info("cluster does not yet have a ControlPlaneEndpoint defined")
+		logger.Info("cluster does not yet have a ControlPlaneEndpoint defined")
 		return ctrl.Result{}, nil
 	}
 
 	// TODO: handle proper adoption of Machines
 	ownedMachines, err := r.getControlPlaneMachinesForCluster(ctx, util.ObjectKey(cluster), tcp.Name)
 	if err != nil {
-		log.Error(err, "failed to retrieve control plane machines for cluster")
+		logger.Error(err, "failed to retrieve control plane machines for cluster")
 		return ctrl.Result{}, err
 	}
 
@@ -74,10 +78,8 @@ func (r *MicroK8sControlPlaneReconciler) reconcile(ctx context.Context,
 	// run all similar reconcile steps in the loop and pick the lowest RetryAfter, aggregate errors and check the requeue flags.
 	for _, phase := range []func(context.Context, *clusterv1.Cluster, *clusterv1beta1.MicroK8sControlPlane,
 		[]clusterv1.Machine) (ctrl.Result, error){
-		// r.reconcileEtcdMembers,
 		r.reconcileNodeHealth,
 		r.reconcileConditions,
-		// r.reconcileKubeconfig,
 		r.reconcileMachines,
 	} {
 		phaseResult, err = phase(ctx, cluster, tcp, ownedMachines)
@@ -114,8 +116,7 @@ func (r *MicroK8sControlPlaneReconciler) reconcileNodeHealth(ctx context.Context
 	return ctrl.Result{}, nil
 }
 
-func (r *MicroK8sControlPlaneReconciler) reconcileMachines(ctx context.Context,
-	cluster *clusterv1.Cluster, mcp *clusterv1beta1.MicroK8sControlPlane, machines []clusterv1.Machine) (res ctrl.Result, err error) {
+func (r *MicroK8sControlPlaneReconciler) reconcileMachines(ctx context.Context, cluster *clusterv1.Cluster, mcp *clusterv1beta1.MicroK8sControlPlane, machines []clusterv1.Machine) (res ctrl.Result, err error) {
 
 	// If we've made it this far, we can assume that all ownedMachines are up to date
 	numMachines := len(machines)
@@ -123,11 +124,130 @@ func (r *MicroK8sControlPlaneReconciler) reconcileMachines(ctx context.Context,
 
 	controlPlane := r.newControlPlane(cluster, mcp, machines)
 
+	logger := log.FromContext(ctx).WithValues("desired", desiredReplicas, "existing", numMachines)
+
+	var oldVersionMachines []clusterv1.Machine
+	var oldVersion, newVersion string
+
+	if numMachines > 0 {
+		sort.Sort(SortByCreationTimestamp(machines))
+		oldVersion = semver.MajorMinor(*machines[0].Spec.Version)
+		newVersion = semver.MajorMinor(mcp.Spec.Version)
+	}
+
+	upgradeStrategySelected := mcp.Spec.UpgradeStrategy
+	if upgradeStrategySelected == "" {
+		upgradeStrategySelected = clusterv1beta1.SmartUpgradeStrategyType
+	}
+
+	if oldVersion != "" && semver.Compare(oldVersion, newVersion) != 0 {
+		if upgradeStrategySelected == clusterv1beta1.RollingUpgradeStrategyType ||
+			(upgradeStrategySelected == clusterv1beta1.SmartUpgradeStrategyType &&
+				numMachines >= 3) {
+
+			// Assumption: The newer machines are appended at the end of the
+			// machines list, due to list being sorted by creation timestamp.
+			// So we take the version at the beginning of the
+			// list to be the older version and version at the end to be the
+			// newer version. This takes care of the following cases:
+			//
+			// 1) During initialisation: All machines have same version, so no
+			// need to find older machines for scaing down.
+			//
+			// 2) When normal scaling/no upgrades: Similar to 1st case, during
+			// normal scaling, all machines have same version.
+			//
+			// 3) When version is changed in b/w upgrades: During this case,
+			// the latest version of machines will be scaled up and all the
+			// older versions will be scaled down.
+
+			oldVersionMachines = append(oldVersionMachines, machines[0])
+
+			// We have a old machine, so we create a new one to increase
+			// the number of machines to one more than the desired number.
+			// This will create an imbalance of one machine and they will
+			// be scaled down to the desired number in the next reconcile.
+
+			if numMachines == desiredReplicas && len(oldVersionMachines) > 0 {
+				conditions.MarkFalse(mcp, clusterv1beta1.ResizedCondition, clusterv1beta1.ScalingUpReason, clusterv1.ConditionSeverityWarning,
+					"Scaling up control plane to %d replicas (actual %d)", desiredReplicas, numMachines)
+
+				// Create a new machine
+				logger.Info("Creating a new node")
+
+				return r.bootControlPlane(ctx, cluster, mcp, controlPlane, false)
+			}
+		} else if upgradeStrategySelected == clusterv1beta1.InPlaceUpgradeStrategyType ||
+			(upgradeStrategySelected == clusterv1beta1.SmartUpgradeStrategyType &&
+				numMachines < 3) {
+
+			// Make a client that interacts with the workload cluster.
+			kubeclient, err := r.kubeconfigForCluster(ctx, util.ObjectKey(cluster))
+			if err != nil {
+				return ctrl.Result{RequeueAfter: 20 * time.Second}, err
+			}
+
+			defer kubeclient.Close() //nolint:errcheck
+
+			// For each machine, get the node and upgrade it
+			for _, machine := range machines {
+
+				// Get the node for the machine
+				node, err := kubeclient.CoreV1().Nodes().Get(ctx, machine.Status.NodeRef.Name, metav1.GetOptions{})
+				if err != nil {
+					return ctrl.Result{RequeueAfter: 20 * time.Second}, err
+				}
+
+				logger.Info(fmt.Sprintf("Creating upgrade pod on %s...", node.Name))
+				pod, err := createUpgradePod(ctx, kubeclient, node.Name, mcp.Spec.Version)
+				if err != nil {
+					logger.Error(err, "Error creating upgrade pod.")
+				}
+
+				logger.Info("Waiting for upgrade node to be updated to the given version...")
+				err = waitForNodeUpgrade(ctx, kubeclient, node.Name, mcp.Spec.Version)
+				if err != nil {
+					logger.Error(err, "Error waiting for node upgrade.")
+				}
+
+				time.Sleep(10 * time.Second)
+
+				// Get the current machine
+				currentMachine := &clusterv1.Machine{}
+				currentMachineName := node.Annotations["cluster.x-k8s.io/machine"]
+				err = r.Client.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: currentMachineName}, currentMachine)
+				if err != nil {
+					logger.Error(err, "Error getting machine.")
+				}
+
+				// Update the machine version
+				currentMachine.Spec.Version = &mcp.Spec.Version
+				logger.Info(fmt.Sprintf("Now updating machine %s version to %s...", currentMachine.Name, *currentMachine.Spec.Version))
+				err = r.Client.Update(ctx, currentMachine)
+				if err != nil {
+					logger.Error(err, "Could not update the machine version. We will retry.")
+				}
+
+				time.Sleep(10 * time.Second)
+
+				// wait until pod is deleted
+				logger.Info(fmt.Sprintf("Removing upgrade pod %s from %s...", pod.ObjectMeta.Name, node.Name))
+				err = waitForPodDeletion(ctx, kubeclient, pod.ObjectMeta.Name)
+				if err != nil {
+					logger.Error(err, "Error waiting for pod deletion.")
+				}
+
+				logger.Info(fmt.Sprintf("Upgrade of node %s completed.\n", node.Name))
+			}
+		}
+
+	}
+
 	switch {
 	// We are creating the first replica
 	case numMachines < desiredReplicas && numMachines == 0:
 		// Create new Machine w/ init
-		log.Info("initializing control plane", "Desired", desiredReplicas, "Existing", numMachines)
+		logger.Info("initializing control plane")
 
 		return r.bootControlPlane(ctx, cluster, mcp, controlPlane, true)
 	// We are scaling up
@@ -136,7 +256,7 @@ func (r *MicroK8sControlPlaneReconciler) reconcileMachines(ctx context.Context,
 			"Scaling up control plane to %d replicas (actual %d)", desiredReplicas, numMachines)
 
 		// Create a new Machine w/ join
-		log.Info("scaling up control plane", "Desired", desiredReplicas, "Existing", numMachines)
+		logger.Info("scaling up control plane")
 
 		return r.bootControlPlane(ctx, cluster, mcp, controlPlane, false)
 	// We are scaling down
@@ -153,18 +273,16 @@ func (r *MicroK8sControlPlaneReconciler) reconcileMachines(ctx context.Context,
 		}
 
 		if err := r.ensureNodesBooted(ctx, controlPlane.MCP, cluster, machines); err != nil {
-			log.Info("waiting for all nodes to finish boot sequence", "error", err)
-
+			logger.Error(err, "waiting for all nodes to finish boot sequence")
 			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 		}
 
-		log.Info("scaling down control plane", "Desired", desiredReplicas, "Existing", numMachines)
+		logger.Info("scaling down control plane")
 
 		res, err = r.scaleDownControlPlane(ctx, mcp, util.ObjectKey(cluster), controlPlane.MCP.Name, machines)
 		if err != nil {
 			if res.Requeue || res.RequeueAfter > 0 {
-				log.Info("failed to scale down control plane", "error", err)
-
+				logger.Error(err, "failed to scale down control plane")
 				return res, nil
 			}
 		}
@@ -175,7 +293,7 @@ func (r *MicroK8sControlPlaneReconciler) reconcileMachines(ctx context.Context,
 			if err := r.bootstrapCluster(ctx, mcp, cluster, machines); err != nil {
 				conditions.MarkFalse(mcp, clusterv1beta1.MachinesBootstrapped, clusterv1beta1.WaitingForMicroK8sBootReason, clusterv1.ConditionSeverityInfo, err.Error())
 
-				log.Info("bootstrap failed, retrying in 20 seconds", "error", err)
+				logger.Info("bootstrap failed, retrying in 20 seconds")
 
 				return ctrl.Result{RequeueAfter: time.Second * 20}, nil
 			}
@@ -216,8 +334,7 @@ func (r *MicroK8sControlPlaneReconciler) reconcileExternalReference(ctx context.
 	return objPatchHelper.Patch(ctx, obj)
 }
 
-func (r *MicroK8sControlPlaneReconciler) bootControlPlane(ctx context.Context, cluster *clusterv1.Cluster, mcp *clusterv1beta1.MicroK8sControlPlane,
-	controlPlane *ControlPlane, first bool) (ctrl.Result, error) {
+func (r *MicroK8sControlPlaneReconciler) bootControlPlane(ctx context.Context, cluster *clusterv1.Cluster, mcp *clusterv1beta1.MicroK8sControlPlane, controlPlane *ControlPlane, first bool) (ctrl.Result, error) {
 	// Since the cloned resource should eventually have a controller ref for the Machine, we create an
 	// OwnerReference here without the Controller field set
 	infraCloneOwner := &metav1.OwnerReference{
@@ -234,6 +351,10 @@ func (r *MicroK8sControlPlaneReconciler) bootControlPlane(ctx context.Context, c
 		Namespace:   mcp.Namespace,
 		OwnerRef:    infraCloneOwner,
 		ClusterName: cluster.Name,
+		Labels: map[string]string{
+			clusterv1.ClusterLabelName:             cluster.Name,
+			clusterv1.MachineControlPlaneLabelName: "",
+		},
 	})
 	if err != nil {
 		conditions.MarkFalse(mcp, clusterv1beta1.MachinesCreatedCondition,
@@ -260,7 +381,7 @@ func (r *MicroK8sControlPlaneReconciler) bootControlPlane(ctx context.Context, c
 			Name:      names.SimpleNameGenerator.GenerateName(mcp.Name + "-"),
 			Namespace: mcp.Namespace,
 			Labels: map[string]string{
-				clusterv1.ClusterLabelName:             cluster.ClusterName,
+				clusterv1.ClusterLabelName:             cluster.Name,
 				clusterv1.MachineControlPlaneLabelName: "",
 			},
 			OwnerReferences: []metav1.OwnerReference{
@@ -294,8 +415,7 @@ func (r *MicroK8sControlPlaneReconciler) bootControlPlane(ctx context.Context, c
 	return ctrl.Result{Requeue: true}, nil
 }
 
-func (r *MicroK8sControlPlaneReconciler) reconcileConditions(ctx context.Context, cluster *clusterv1.Cluster, tcp *clusterv1beta1.MicroK8sControlPlane,
-	machines []clusterv1.Machine) (result ctrl.Result, err error) {
+func (r *MicroK8sControlPlaneReconciler) reconcileConditions(ctx context.Context, cluster *clusterv1.Cluster, tcp *clusterv1beta1.MicroK8sControlPlane, machines []clusterv1.Machine) (result ctrl.Result, err error) {
 	if !conditions.Has(tcp, clusterv1beta1.AvailableCondition) {
 		conditions.MarkFalse(tcp, clusterv1beta1.AvailableCondition, clusterv1beta1.WaitingForMicroK8sBootReason, clusterv1.ConditionSeverityInfo, "")
 	}
@@ -320,8 +440,7 @@ func (r *MicroK8sControlPlaneReconciler) getFailureDomain(ctx context.Context, c
 	return retList
 }
 
-func (r *MicroK8sControlPlaneReconciler) reconcileDelete(ctx context.Context, cluster *clusterv1.Cluster,
-	tcp *clusterv1beta1.MicroK8sControlPlane) (ctrl.Result, error) {
+func (r *MicroK8sControlPlaneReconciler) reconcileDelete(ctx context.Context, cluster *clusterv1.Cluster, tcp *clusterv1beta1.MicroK8sControlPlane) (ctrl.Result, error) {
 	// Get list of all control plane machines
 	ownedMachines, err := r.getControlPlaneMachinesForCluster(ctx, util.ObjectKey(cluster), tcp.Name)
 	if err != nil {
@@ -346,13 +465,25 @@ func (r *MicroK8sControlPlaneReconciler) reconcileDelete(ctx context.Context, cl
 		}
 	}
 
+	// clean up MicroK8s cluster secrets
+	for _, secretName := range []string{"kubeconfig", "ca", "jointoken"} {
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: cluster.Namespace,
+				Name:      fmt.Sprintf("%s-%s", cluster.Name, secretName),
+			},
+		}
+		if err := r.Client.Delete(ctx, secret); err != nil && !apierrors.IsNotFound(err) {
+			log.FromContext(ctx).Error(err, "failed to delete secret", "secret", secret.Name)
+		}
+	}
+
 	conditions.MarkFalse(tcp, clusterv1beta1.ResizedCondition, clusterv1.DeletingReason, clusterv1.ConditionSeverityInfo, "")
 	// Requeue the deletion so we can check to make sure machines got cleaned up
 	return ctrl.Result{RequeueAfter: requeueDuration}, nil
 }
 
-func (r *MicroK8sControlPlaneReconciler) bootstrapCluster(ctx context.Context, tcp *clusterv1beta1.MicroK8sControlPlane,
-	cluster *clusterv1.Cluster, machines []clusterv1.Machine) error {
+func (r *MicroK8sControlPlaneReconciler) bootstrapCluster(ctx context.Context, tcp *clusterv1beta1.MicroK8sControlPlane, cluster *clusterv1.Cluster, machines []clusterv1.Machine) error {
 
 	addresses := []string{}
 	for _, machine := range machines {
@@ -380,13 +511,13 @@ func (r *MicroK8sControlPlaneReconciler) bootstrapCluster(ctx context.Context, t
 	return nil
 }
 
-func (r *MicroK8sControlPlaneReconciler) scaleDownControlPlane(ctx context.Context, tcp *clusterv1beta1.MicroK8sControlPlane,
-	cluster client.ObjectKey, cpName string, machines []clusterv1.Machine) (ctrl.Result, error) {
+func (r *MicroK8sControlPlaneReconciler) scaleDownControlPlane(ctx context.Context, tcp *clusterv1beta1.MicroK8sControlPlane, cluster client.ObjectKey, cpName string, machines []clusterv1.Machine) (ctrl.Result, error) {
 	if len(machines) == 0 {
 		return ctrl.Result{}, fmt.Errorf("no machines found")
 	}
 
-	log.Info("Found control plane machines", "machines", len(machines))
+	logger := log.FromContext(ctx)
+	logger.WithValues("machines", len(machines)).Info("found control plane machines")
 
 	kubeclient, err := r.kubeconfigForCluster(ctx, cluster)
 	if err != nil {
@@ -399,8 +530,9 @@ func (r *MicroK8sControlPlaneReconciler) scaleDownControlPlane(ctx context.Conte
 	machine := machines[len(machines)-1]
 	for i := len(machines) - 1; i >= 0; i-- {
 		machine = machines[i]
+		logger := logger.WithValues("machineName", machine.Name)
 		if !machine.ObjectMeta.DeletionTimestamp.IsZero() {
-			log.Info("machine is in process of deletion", "machine", machine.Name)
+			logger.Info("machine is in process of deletion")
 
 			node, err := kubeclient.CoreV1().Nodes().Get(ctx, machine.Status.NodeRef.Name, metav1.GetOptions{})
 			if err != nil {
@@ -413,7 +545,7 @@ func (r *MicroK8sControlPlaneReconciler) scaleDownControlPlane(ctx context.Conte
 			}
 
 			// TODO: drain and cordon the node
-			log.Info("Deleting node", "machine", machine.Name, "node", node.Name)
+			logger.WithValues("nodeName", node.Name).Info("deleting node")
 
 			err = kubeclient.CoreV1().Nodes().Delete(ctx, node.Name, metav1.DeleteOptions{})
 			if err != nil {
@@ -425,11 +557,11 @@ func (r *MicroK8sControlPlaneReconciler) scaleDownControlPlane(ctx context.Conte
 
 		// do not allow scaling down until all nodes have nodeRefs
 		if machine.Status.NodeRef == nil {
-			log.Info("one of machines does not have NodeRef", "machine", machine.Name)
-
+			logger.Info("one of machines does not have NodeRef")
 			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 		}
 
+		// mark the oldest machine to be deleted first
 		if machine.CreationTimestamp.Before(&deleteMachine.CreationTimestamp) {
 			deleteMachine = machine
 		}
@@ -441,15 +573,15 @@ func (r *MicroK8sControlPlaneReconciler) scaleDownControlPlane(ctx context.Conte
 
 	node := deleteMachine.Status.NodeRef
 
-	log.Info("deleting machine", "machine", deleteMachine.Name, "node", node.Name)
+	logger = logger.WithValues("machineName", deleteMachine.Name, "nodeName", node.Name)
+	logger.Info("deleting machine")
 
 	err = r.Client.Delete(ctx, &deleteMachine)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	log.Info("deleting node", "machine", deleteMachine.Name, "node", node.Name)
-
+	logger.Info("deleting node")
 	err = kubeclient.CoreV1().Nodes().Delete(ctx, node.Name, metav1.DeleteOptions{})
 	if err != nil {
 		return ctrl.Result{RequeueAfter: 20 * time.Second}, err
@@ -457,4 +589,96 @@ func (r *MicroK8sControlPlaneReconciler) scaleDownControlPlane(ctx context.Conte
 
 	// Requeue so that we handle any additional scaling.
 	return ctrl.Result{Requeue: true}, nil
+}
+
+func createUpgradePod(ctx context.Context, kubeclient *kubernetesClient, nodeName string, nodeVersion string) (*corev1.Pod, error) {
+	nodeVersion = strings.TrimPrefix(semver.MajorMinor(nodeVersion), "v")
+
+	uid := int64(0)
+	priv := true
+
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "upgrade-pod",
+		},
+		Spec: corev1.PodSpec{
+			NodeName: nodeName,
+			Containers: []corev1.Container{
+				{
+					Name:  "upgrade",
+					Image: "curlimages/curl:7.87.0",
+					Command: []string{
+						"su",
+						"-c",
+					},
+					SecurityContext: &corev1.SecurityContext{Privileged: &priv, RunAsUser: &uid},
+					Args: []string{
+						fmt.Sprintf("curl -X POST -H \"Content-Type: application/json\" --unix-socket /run/snapd.socket -d '{\"action\": \"refresh\",\"channel\":\"%s/stable\"}' http://localhost/v2/snaps/microk8s", nodeVersion),
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{
+							Name:      "snapd-socket",
+							MountPath: "/run/snapd.socket",
+						},
+					},
+				},
+			},
+			Volumes: []corev1.Volume{
+				{
+					Name: "snapd-socket",
+					VolumeSource: corev1.VolumeSource{
+						HostPath: &corev1.HostPathVolumeSource{
+							Path: "/run/snapd.socket",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	pod, err := kubeclient.CoreV1().Pods("default").Create(ctx, pod, metav1.CreateOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	return pod, nil
+}
+
+func waitForNodeUpgrade(ctx context.Context, kubeclient *kubernetesClient, nodeName, nodeVersion string) error {
+	// attempt to connect 60 times. With a wait of 10 secs this should be 600 sec = 10 min
+	attempts := 60
+	for attempts > 0 {
+		node, err := kubeclient.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		currentVersion := semver.MajorMinor(node.Status.NodeInfo.KubeletVersion)
+		nodeVersion = semver.MajorMinor(nodeVersion)
+		if strings.HasPrefix(currentVersion, nodeVersion) {
+			break
+		}
+		time.Sleep(10 * time.Second)
+		attempts--
+	}
+	return nil
+}
+
+func waitForPodDeletion(ctx context.Context, kubeclient *kubernetesClient, podName string) error {
+	for {
+		gracePeriod := int64(0)
+		deleteOptions := metav1.DeleteOptions{
+			GracePeriodSeconds: &gracePeriod,
+		}
+		err := kubeclient.CoreV1().Pods("default").Delete(ctx, podName, deleteOptions)
+		time.Sleep(10 * time.Second)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				break
+			}
+			return err
+		} else {
+			break
+		}
+	}
+	return nil
 }

@@ -23,12 +23,31 @@ import (
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
+// UpgradeStrategyType is a string representing the upgrade strategy.
+type UpgradeStrategyType string
+
+const (
+	// SmartUpgradeStrategyType is an upgrade strategy that
+	// performs an in-place upgrade of the control plane on non-HA clusters and
+	// a rolling upgrade on HA clusters.
+	SmartUpgradeStrategyType UpgradeStrategyType = "SmartUpgrade"
+
+	// InPlaceUpgradeStrategyType is an upgrade strategy that
+	// performs an in-place upgrade of the control plane.
+	InPlaceUpgradeStrategyType UpgradeStrategyType = "InPlaceUpgrade"
+
+	// RollingUpdateStrategyType is an upgrade strategy that
+	// deletes the current control plane machine before creating
+	// a new one.
+	RollingUpgradeStrategyType UpgradeStrategyType = "RollingUpgrade"
+)
+
 const (
 	MicroK8sControlPlaneFinalizer = "microk8s.controlplane.cluster.x-k8s.io"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+// MachineTemplate defines the metadata and infrastructure information
+// for control plane machines.
 type MachineTemplate struct {
 	// InfrastructureTemplate is a required reference to a custom resource
 	// offered by an infrastructure provider.
@@ -37,9 +56,7 @@ type MachineTemplate struct {
 
 // MicroK8sControlPlaneSpec defines the desired state of MicroK8sControlPlane
 type MicroK8sControlPlaneSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
+	// Replicas is the desired number of control-plane machine replicas.
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
 
@@ -48,9 +65,19 @@ type MicroK8sControlPlaneSpec struct {
 	// +kubebuilder:validation:Pattern:=^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)([-0-9a-zA-Z_\.+]*)?$
 	Version string `json:"version"`
 
+	// MachineTemplate is the machine template to be used for
+	// creating control plane machines.
 	MachineTemplate `json:"machineTemplate"`
 
-	// to use for initializing and joining machines to the control plane.
+	// UpgradeStrategy describes how to replace existing machines
+	// with new ones.
+	// Values can be: InPlaceUpgrade, RollingUpgrade or SmartUpgrade.
+	// +optional
+	// +kubebuilder:validation:Enum=InPlaceUpgrade;RollingUpgrade;SmartUpgrade
+	UpgradeStrategy UpgradeStrategyType `json:"upgradeStrategy"`
+
+	// ControlPlaneConfig is the reference configs to be used for initializing and joining
+	// machines to the control plane.
 	// +optional
 	ControlPlaneConfig v1beta1.MicroK8sConfigSpec `json:"controlPlaneConfig,omitempty"`
 }
@@ -85,17 +112,17 @@ type MicroK8sControlPlaneStatus struct {
 	UnavailableReplicas int32 `json:"unavailableReplicas,omitempty"`
 
 	// Initialized denotes whether or not the control plane has the
-	// uploaded talos-config configmap.
+	// uploaded microk8s-config configmap.
 	// +optional
 	Initialized bool `json:"initialized"`
 
-	// Ready denotes that the TalosControlPlane API Server is ready to
+	// Ready denotes that the MicroK8sControlPlane API Server is ready to
 	// receive requests.
 	// +optional
 	Ready bool `json:"ready"`
 
 	// Bootstrapped denotes whether any nodes received bootstrap request
-	// which is required to start etcd and Kubernetes components in Talos.
+	// which is required to start etcd and Kubernetes components in MicroK8s.
 	// +optional
 	Bootstrapped bool `json:"bootstrapped,omitempty"`
 
@@ -113,8 +140,8 @@ type MicroK8sControlPlaneStatus struct {
 // +kubebuilder:storageversion
 // +kubebuilder:subresource:status
 // +kubebuilder:subresource:scale:specpath=.spec.replicas,statuspath=.status.replicas,selectorpath=.status.selector
-// +kubebuilder:printcolumn:name="Ready",type=boolean,JSONPath=".status.ready",description="TalosControlPlane API Server is ready to receive requests"
-// +kubebuilder:printcolumn:name="Initialized",type=boolean,JSONPath=".status.initialized",description="This denotes whether or not the control plane has the uploaded talos-config configmap"
+// +kubebuilder:printcolumn:name="Ready",type=boolean,JSONPath=".status.ready",description="MicroK8sControlPlane API Server is ready to receive requests"
+// +kubebuilder:printcolumn:name="Initialized",type=boolean,JSONPath=".status.initialized",description="This denotes whether or not the control plane has the uploaded microk8s-config configmap"
 // +kubebuilder:printcolumn:name="Replicas",type=integer,JSONPath=".status.replicas",description="Total number of non-terminated machines targeted by this control plane"
 // +kubebuilder:printcolumn:name="Ready Replicas",type=integer,JSONPath=".status.readyReplicas",description="Total number of fully running and ready control plane machines"
 // +kubebuilder:printcolumn:name="Unavailable Replicas",type=integer,JSONPath=".status.unavailableReplicas",description="Total number of unavailable machines targeted by this control plane"

@@ -105,6 +105,9 @@ func (r *MicroK8sControlPlaneReconciler) kubeconfigForCluster(ctx context.Contex
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: cluster.Namespace,
 				Name:      cluster.Name + "-kubeconfig",
+				Labels: map[string]string{
+					clusterv1.ClusterLabelName: cluster.Name,
+				},
 			},
 			Data: map[string][]byte{
 				"value": []byte(*kubeconfig),
@@ -185,7 +188,7 @@ func (r *MicroK8sControlPlaneReconciler) genarateKubeconfig(ctx context.Context,
 	cert := &x509.Certificate{
 		SerialNumber: big.NewInt(2019),
 		Subject: pkix.Name{
-			Organization:  []string{"Canonical"},
+			Organization:  []string{"admin", "system:masters"},
 			Country:       []string{"GB"},
 			Province:      []string{""},
 			Locality:      []string{"Canonical"},
@@ -210,16 +213,20 @@ func (r *MicroK8sControlPlaneReconciler) genarateKubeconfig(ctx context.Context,
 	}
 
 	certPEM := new(bytes.Buffer)
-	pem.Encode(certPEM, &pem.Block{
+	if err := pem.Encode(certPEM, &pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: certBytes,
-	})
+	}); err != nil {
+		return nil, err
+	}
 
 	keyPEM := new(bytes.Buffer)
-	pem.Encode(keyPEM, &pem.Block{
+	if err := pem.Encode(keyPEM, &pem.Block{
 		Type:  "RSA PRIVATE KEY",
 		Bytes: x509.MarshalPKCS1PrivateKey(certPrivKey),
-	})
+	}); err != nil {
+		return nil, err
+	}
 
 	config := strings.Replace(templateConfig, "<HOST>", host, -1)
 	config = strings.Replace(config, "<CACERT>", base64.StdEncoding.EncodeToString(readCASecret.Data["crt"]), -1)
