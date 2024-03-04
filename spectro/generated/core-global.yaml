@@ -109,6 +109,13 @@ spec:
                           schemas to the latest internal value, and may reject unrecognized
                           values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
                         type: string
+                      bootCommands:
+                        description: BootCommands is a list of commands to run during
+                          boot. These will be injected into the `bootcmd` section
+                          of cloud-init.
+                        items:
+                          type: string
+                        type: array
                       confinement:
                         description: The confinement (strict or classic) configuration
                         enum:
@@ -170,6 +177,20 @@ spec:
                       noProxy:
                         description: The optional no proxy configuration
                         type: string
+                      postRunCommands:
+                        description: PostRunCommands is a list of commands to run
+                          after installing MicroK8s. These will be injected into the
+                          `runcmd` section of cloud-init.
+                        items:
+                          type: string
+                        type: array
+                      preRunCommands:
+                        description: PreRunCommands is a list of commands to run before
+                          installing MicroK8s. These will be injected into the `runcmd`
+                          section of cloud-init.
+                        items:
+                          type: string
+                        type: array
                       riskLevel:
                         default: stable
                         description: The risk-level (stable, candidate, beta, or edge)
@@ -237,6 +258,7 @@ spec:
                         description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
                         type: string
                     type: object
+                    x-kubernetes-map-type: atomic
                 required:
                 - infrastructureTemplate
                 type: object
