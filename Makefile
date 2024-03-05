@@ -1,7 +1,7 @@
 ARCH ?= amd64
 ALL_ARCH = amd64 arm64
 SPECTRO_VERSION ?= 4.1.0-dev
-TAG ?= v0.6.5-spectro-${SPECTRO_VERSION}
+TAG ?= v0.4.0-spectro-${SPECTRO_VERSION}
 # Image URL to use all building/pushing image targets
 REGISTRY ?= gcr.io/spectro-dev-public/$(USER)/capi-control-plane-provider-microk8s
 IMG ?= ${REGISTRY}:${TAG}
