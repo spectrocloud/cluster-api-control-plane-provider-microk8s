@@ -94,13 +94,12 @@ func (r *MicroK8sControlPlaneReconciler) updateStatus(ctx context.Context, mcp *
 	if len(nodes.Items) > 0 {
 		mcp.Status.Initialized = true
 		conditions.MarkTrue(mcp, clusterv1beta1.AvailableCondition)
-	}
 
-	if mcp.Status.ReadyReplicas > 0 {
+		// The control plane is Ready to receive requests
 		mcp.Status.Ready = true
 	}
 
-	logger.WithValues("count", mcp.Status.ReadyReplicas).Info("ready replicas")
+	logger.WithValues("ready", mcp.Status.Ready, "count", mcp.Status.ReadyReplicas).Info("ready replicas")
 
 	return nil
 }
