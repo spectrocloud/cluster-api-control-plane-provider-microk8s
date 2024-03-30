@@ -18,7 +18,10 @@ package main
 
 import (
 	"flag"
+	"github.com/spf13/pflag"
+	"k8s.io/klog/v2"
 	"os"
+	"sigs.k8s.io/cluster-api/feature"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -43,9 +46,14 @@ import (
 var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
+
+	// flags
+	watchNamespace string
 )
 
 func init() {
+	klog.InitFlags(nil)
+
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(clusterv1.AddToScheme(scheme))
 	utilruntime.Must(v1beta1.AddToScheme(scheme))
@@ -54,7 +62,27 @@ func init() {
 	//+kubebuilder:scaffold:scheme
 }
 
+// InitFlags initializes the flags.
+func InitFlags(fs *pflag.FlagSet) {
+	fs.StringVar(
+		&watchNamespace,
+		"namespace",
+		"",
+		"Namespace that the controller watches to reconcile cluster-api objects. If unspecified, the controller watches for cluster-api objects across all namespaces.",
+	)
+
+	feature.MutableGates.AddFlag(fs)
+}
+
 func main() {
+	InitFlags(pflag.CommandLine)
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+	pflag.Parse()
+
+	if watchNamespace != "" {
+		setupLog.Info("Watching cluster-api objects only in namespace for reconciliation", "namespace", watchNamespace)
+	}
+
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
@@ -78,6 +106,7 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "microk8s-control-plane-manager-leader-election-capi",
+		Namespace:              watchNamespace,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
