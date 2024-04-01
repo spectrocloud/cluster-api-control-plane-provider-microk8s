@@ -18,7 +18,6 @@ package main
 
 import (
 	"flag"
-	"github.com/spf13/pflag"
 	"os"
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -59,13 +58,6 @@ func init() {
 }
 
 func main() {
-	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
-	pflag.Parse()
-
-	if watchNamespace != "" {
-		setupLog.Info("Watching cluster-api objects only in namespace for reconciliation", "namespace", watchNamespace)
-	}
-
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
