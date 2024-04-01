@@ -19,10 +19,7 @@ package main
 import (
 	"flag"
 	"github.com/spf13/pflag"
-	"k8s.io/klog/v2"
 	"os"
-	"sigs.k8s.io/cluster-api/feature"
-
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -52,7 +49,6 @@ var (
 )
 
 func init() {
-	klog.InitFlags(nil)
 
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(clusterv1.AddToScheme(scheme))
@@ -62,20 +58,7 @@ func init() {
 	//+kubebuilder:scaffold:scheme
 }
 
-// InitFlags initializes the flags.
-func InitFlags(fs *pflag.FlagSet) {
-	fs.StringVar(
-		&watchNamespace,
-		"namespace",
-		"",
-		"Namespace that the controller watches to reconcile cluster-api objects. If unspecified, the controller watches for cluster-api objects across all namespaces.",
-	)
-
-	feature.MutableGates.AddFlag(fs)
-}
-
 func main() {
-	InitFlags(pflag.CommandLine)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 
@@ -91,6 +74,7 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+	flag.StringVar(&watchNamespace, "namespace", "", "Namespace that the controller watches to reconcile cluster-api objects. If unspecified, the controller watches for cluster-api objects across all namespaces.")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -98,6 +82,10 @@ func main() {
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	if watchNamespace != "" {
+		setupLog.Info("Watching cluster-api objects only in namespace for reconciliation\", \"namespace", watchNamespace)
+	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
