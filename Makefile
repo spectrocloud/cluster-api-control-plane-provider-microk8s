@@ -96,7 +96,7 @@ docker-manifest: docker-push ## Push docker multi-arch manifest.
 
 .PHONY: lint
 lint: golangci-lint ## Lint the codebase
-	$(GOLANGCI_LINT) run -v --go=1.19 --timeout 3m0s
+	$(GOLANGCI_LINT) run -v --go=1.21 --timeout 3m0s
 
 ##@ Deployment
 
@@ -124,7 +124,7 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 GOLANGCI_LINT = $(shell pwd)/bin/golangci-lint
 .PHONY: golangci-lint
 golangci-lint: ## Download golangci-lint locally if necessary.
-	$(call go-get-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/cmd/golangci-lint@v1.50.1)
+	$(call go-get-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/cmd/golangci-lint@v1.57.2)
 
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
 .PHONY: controller-gen
