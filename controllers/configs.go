@@ -9,6 +9,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/base64"
 	"encoding/pem"
+	"fmt"
 	"math/big"
 	"net"
 	"strings"
@@ -37,7 +38,7 @@ apiVersion: v1
 clusters:
 - cluster:
     certificate-authority-data: <CACERT>
-    server: https://<HOST>:6443
+    server: https://<HOST>:<PORT>
   name: microk8s-cluster
 contexts:
 - context:
@@ -97,7 +98,7 @@ func (r *MicroK8sControlPlaneReconciler) kubeconfigForCluster(ctx context.Contex
 		return nil, err
 	}
 	if !found && c.Spec.ControlPlaneEndpoint.IsValid() {
-		kubeconfig, err := r.genarateKubeconfig(ctx, cluster, c.Spec.ControlPlaneEndpoint.Host)
+		kubeconfig, err := r.generateKubeconfig(ctx, cluster, c.Spec.ControlPlaneEndpoint.Host, c.Spec.ControlPlaneEndpoint.Port)
 		if err != nil {
 			return nil, err
 		}
@@ -149,7 +150,7 @@ func (r *MicroK8sControlPlaneReconciler) kubeconfigForCluster(ctx context.Contex
 	}, nil
 }
 
-func (r *MicroK8sControlPlaneReconciler) genarateKubeconfig(ctx context.Context, cluster client.ObjectKey, host string) (kubeconfig *string, err error) {
+func (r *MicroK8sControlPlaneReconciler) generateKubeconfig(ctx context.Context, cluster client.ObjectKey, host string, port int32) (kubeconfig *string, err error) {
 	// Get the secret with the CA
 	readCASecret := &corev1.Secret{}
 	err = r.Client.Get(ctx,
@@ -228,7 +229,13 @@ func (r *MicroK8sControlPlaneReconciler) genarateKubeconfig(ctx context.Context,
 		return nil, err
 	}
 
+	// handle unset port value
+	if port == 0 {
+		port = 6443
+	}
+
 	config := strings.Replace(templateConfig, "<HOST>", host, -1)
+	config = strings.Replace(config, "<PORT>", fmt.Sprintf("%d", port), -1)
 	config = strings.Replace(config, "<CACERT>", base64.StdEncoding.EncodeToString(readCASecret.Data["crt"]), -1)
 	config = strings.Replace(config, "<CERT>", base64.StdEncoding.EncodeToString(certPEM.Bytes()), -1)
 	config = strings.Replace(config, "<KEY>", base64.StdEncoding.EncodeToString(keyPEM.Bytes()), -1)
