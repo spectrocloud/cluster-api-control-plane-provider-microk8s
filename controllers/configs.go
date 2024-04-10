@@ -21,6 +21,7 @@ import (
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -79,17 +80,17 @@ func (r *MicroK8sControlPlaneReconciler) kubeconfigForCluster(ctx context.Contex
 	kubeconfigSecret := &corev1.Secret{}
 
 	// See if the kubeconfig exists. If not create it.
-	secrets := &corev1.SecretList{}
-	err := r.Client.List(ctx, secrets)
-	if err != nil {
+	var found bool
+	err := r.Client.Get(ctx, types.NamespacedName{
+		Namespace: cluster.Namespace,
+		Name:      fmt.Sprintf("%s-kubeconfig", cluster.Name),
+	}, kubeconfigSecret)
+	switch {
+	case err == nil:
+		found = true
+	case apierrors.IsNotFound(err):
+	default:
 		return nil, err
-	}
-
-	found := false
-	for _, s := range secrets.Items {
-		if s.Name == cluster.Name+"-kubeconfig" {
-			found = true
-		}
 	}
 
 	c := &clusterv1.Cluster{}
