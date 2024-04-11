@@ -77,62 +77,53 @@ func newDialer() *connrotation.Dialer {
 // kubeconfigForCluster will fetch a kubeconfig secret based on cluster name/namespace,
 // use it to create a clientset, and return it.
 func (r *MicroK8sControlPlaneReconciler) kubeconfigForCluster(ctx context.Context, cluster client.ObjectKey) (*kubernetesClient, error) {
-	kubeconfigSecret := &corev1.Secret{}
+	secret := &corev1.Secret{}
 
 	// See if the kubeconfig exists. If not create it.
-	var found bool
 	err := r.Client.Get(ctx, types.NamespacedName{
 		Namespace: cluster.Namespace,
 		Name:      fmt.Sprintf("%s-kubeconfig", cluster.Name),
-	}, kubeconfigSecret)
+	}, secret)
 	switch {
 	case err == nil:
-		found = true
+		return clientFromKubeconfig(secret.Data["value"])
 	case apierrors.IsNotFound(err):
 	default:
 		return nil, err
 	}
 
 	c := &clusterv1.Cluster{}
-	err = r.Client.Get(ctx, cluster, c)
+	if err := r.Client.Get(ctx, cluster, c); err != nil {
+		return nil, err
+	}
+	if !c.Spec.ControlPlaneEndpoint.IsValid() {
+		return nil, fmt.Errorf("ControlPlaneEndpoint is not set yet, cannot generate kubeconfig yet")
+	}
+
+	kubeconfig, err := r.generateKubeconfig(ctx, cluster, c.Spec.ControlPlaneEndpoint.Host, c.Spec.ControlPlaneEndpoint.Port)
 	if err != nil {
 		return nil, err
 	}
-	if !found && c.Spec.ControlPlaneEndpoint.IsValid() {
-		kubeconfig, err := r.generateKubeconfig(ctx, cluster, c.Spec.ControlPlaneEndpoint.Host, c.Spec.ControlPlaneEndpoint.Port)
-		if err != nil {
-			return nil, err
-		}
-		configsecret := &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: cluster.Namespace,
-				Name:      cluster.Name + "-kubeconfig",
-				Labels: map[string]string{
-					clusterv1.ClusterLabelName: cluster.Name,
-				},
-			},
-			Data: map[string][]byte{
-				"value": []byte(*kubeconfig),
-			},
-		}
-		err = r.Client.Create(ctx, configsecret)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	err = r.Client.Get(ctx,
-		types.NamespacedName{
+	secret = &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: cluster.Namespace,
 			Name:      cluster.Name + "-kubeconfig",
+			Labels: map[string]string{
+				clusterv1.ClusterLabelName: cluster.Name,
+			},
 		},
-		kubeconfigSecret,
-	)
-	if err != nil {
+		Data: map[string][]byte{
+			"value": []byte(*kubeconfig),
+		},
+	}
+	if err := r.Client.Create(ctx, secret); err != nil {
 		return nil, err
 	}
+	return clientFromKubeconfig([]byte(*kubeconfig))
+}
 
-	config, err := clientcmd.RESTConfigFromKubeConfig(kubeconfigSecret.Data["value"])
+func clientFromKubeconfig(kubeconfigBytes []byte) (*kubernetesClient, error) {
+	config, err := clientcmd.RESTConfigFromKubeConfig(kubeconfigBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +141,6 @@ func (r *MicroK8sControlPlaneReconciler) kubeconfigForCluster(ctx context.Contex
 		dialer:    dialer,
 	}, nil
 }
-
 func (r *MicroK8sControlPlaneReconciler) generateKubeconfig(ctx context.Context, cluster client.ObjectKey, host string, port int32) (kubeconfig *string, err error) {
 	// Get the secret with the CA
 	readCASecret := &corev1.Secret{}
