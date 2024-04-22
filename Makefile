@@ -6,7 +6,7 @@ TAG ?= v0.6.6-spectro-${SPECTRO_VERSION}
 REGISTRY ?= gcr.io/spectro-dev-public/$(USER)/capi-control-plane-provider-microk8s
 IMG ?= ${REGISTRY}:${TAG}
 
-BUILDER_GOLANG_VERSION ?= 1.21
+BUILDER_GOLANG_VERSION ?= 1.22
 BUILD_ARGS = --build-arg CRYPTO_LIB=${FIPS_ENABLE} --build-arg BUILDER_GOLANG_VERSION=${BUILDER_GOLANG_VERSION}
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
