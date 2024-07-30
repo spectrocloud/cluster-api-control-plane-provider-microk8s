@@ -120,6 +120,9 @@ spec:
                         - classic
                         - strict
                         type: string
+                      disableDefaultCNI:
+                        description: Whether or not to use the default CNI
+                        type: boolean
                       extraKubeletArgs:
                         description: ExtraKubeletArgs is a list of extra arguments
                           to add to the kubelet.
