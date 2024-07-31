@@ -81,8 +81,8 @@ github.com/blang/semver v3.5.1+incompatible/go.mod h1:kRBLl5iJ+tD4TcOOxsy/0fnweb
 github.com/blang/semver/v4 v4.0.0 h1:1PFHFE6yCCTv8C1TeyNNarDzntLi7wMI5i/pzqYIsAM=
 github.com/blang/semver/v4 v4.0.0/go.mod h1:IbckMUScFkM3pff0VJDNKRiT6TG/YpiHIM2yvyW5YoQ=
 github.com/buger/jsonparser v1.1.1/go.mod h1:6RYKKt7H4d4+iWqouImQ9R2FZql3VbhNgx27UK13J/0=
-github.com/canonical/cluster-api-bootstrap-provider-microk8s v0.6.9-api h1:wlS8dXLofkWI2rHlgr6U/iviwBXWPl93t/0064uV880=
-github.com/canonical/cluster-api-bootstrap-provider-microk8s v0.6.9-api/go.mod h1:U/c+efAG83sqU+L502RgtfS8v7VOYCWEg3LNbJYFQz0=
+github.com/canonical/cluster-api-bootstrap-provider-microk8s v0.6.9 h1:j9r6uqoyIchT9Yz/WEjib8vXY7sS+IRdiC6eYRD5ht4=
+github.com/canonical/cluster-api-bootstrap-provider-microk8s v0.6.9/go.mod h1:U/c+efAG83sqU+L502RgtfS8v7VOYCWEg3LNbJYFQz0=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=
 github.com/cespare/xxhash v1.1.0/go.mod h1:XrSqR1VqqWfGrhpAt58auRo0WTKS1nRRg3ghfAqPWnc=
 github.com/cespare/xxhash/v2 v2.1.1/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=

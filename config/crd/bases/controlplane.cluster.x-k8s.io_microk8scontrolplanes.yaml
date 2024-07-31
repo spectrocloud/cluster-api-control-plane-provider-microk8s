@@ -216,6 +216,10 @@ spec:
                       snapstoreProxyId:
                         description: The snap store proxy ID
                         type: string
+                      snapstoreProxyScheme:
+                        description: The snap store proxy domain's scheme, e.g. "http"
+                          or "https" without "://" Defaults to "http".
+                        type: string
                     type: object
                 type: object
               machineTemplate:
