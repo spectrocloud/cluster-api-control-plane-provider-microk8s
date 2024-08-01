@@ -3,7 +3,7 @@ module github.com/canonical/cluster-api-control-plane-provider-microk8s
 go 1.21
 
 require (
-	github.com/canonical/cluster-api-bootstrap-provider-microk8s v0.6.9-api
+	github.com/canonical/cluster-api-bootstrap-provider-microk8s v0.6.9
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.22.1
 	k8s.io/api v0.25.3
