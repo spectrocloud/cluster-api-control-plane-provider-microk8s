@@ -122,6 +122,9 @@ spec:
                         - classic
                         - strict
                         type: string
+                      disableDefaultCNI:
+                        description: Whether or not to use the default CNI
+                        type: boolean
                       extraKubeletArgs:
                         description: ExtraKubeletArgs is a list of extra arguments
                           to add to the kubelet.
@@ -214,6 +217,10 @@ spec:
                         type: string
                       snapstoreProxyId:
                         description: The snap store proxy ID
+                        type: string
+                      snapstoreProxyScheme:
+                        description: The snap store proxy domain's scheme, e.g. "http"
+                          or "https" without "://" Defaults to "http".
                         type: string
                     type: object
                 type: object
