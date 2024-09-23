@@ -531,6 +531,16 @@ func (r *MicroK8sControlPlaneReconciler) scaleDownControlPlane(ctx context.Conte
 	for i := len(machines) - 1; i >= 0; i-- {
 		machine = machines[i]
 		logger := logger.WithValues("machineName", machine.Name)
+
+		// do not allow scaling down until all nodes have nodeRefs
+		// NOTE(hue): this might happen when we're trying to delete a machine instance that CAN NOT
+		// get a nodeRef, e.g. because the infra provider is not able to create the machine.
+		// In this case, requeueing here will not solve the issue and only prevents the machine from being deleted.
+		if machine.Status.NodeRef == nil {
+			logger.Info("machine does not have a nodeRef yet")
+			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+		}
+
 		if !machine.ObjectMeta.DeletionTimestamp.IsZero() {
 			logger.Info("machine is in process of deletion")
 
@@ -553,12 +563,6 @@ func (r *MicroK8sControlPlaneReconciler) scaleDownControlPlane(ctx context.Conte
 			}
 
 			return ctrl.Result{RequeueAfter: 20 * time.Second}, nil
-		}
-
-		// do not allow scaling down until all nodes have nodeRefs
-		if machine.Status.NodeRef == nil {
-			logger.Info("one of machines does not have NodeRef")
-			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 		}
 
 		// mark the oldest machine to be deleted first
