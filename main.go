@@ -19,23 +19,25 @@ package main
 import (
 	"flag"
 	"os"
+
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
-
-	"github.com/canonical/cluster-api-control-plane-provider-microk8s/api/v1beta1"
-	"github.com/canonical/cluster-api-control-plane-provider-microk8s/controllers"
-
-	bootstrapv1beta1 "github.com/canonical/cluster-api-bootstrap-provider-microk8s/apis/v1beta1"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
+
+	bootstrapv1beta1 "github.com/canonical/cluster-api-bootstrap-provider-microk8s/apis/v1beta1"
+	"github.com/canonical/cluster-api-control-plane-provider-microk8s/api/v1beta1"
+	"github.com/canonical/cluster-api-control-plane-provider-microk8s/controllers"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -80,15 +82,22 @@ func main() {
 		setupLog.Info("Watching cluster-api objects only in namespace for reconciliation", "namespace", watchNamespace)
 	}
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                 scheme,
-		MetricsBindAddress:     metricsAddr,
-		Port:                   9443,
+	options := ctrl.Options{
+		Scheme: scheme,
+		Metrics: server.Options{
+			BindAddress: metricsAddr,
+		},
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "microk8s-control-plane-manager-leader-election-capi",
-		Namespace:              watchNamespace,
-	})
+	}
+	if watchNamespace != "" {
+		options.Cache.DefaultNamespaces = map[string]cache.Config{
+			watchNamespace: {},
+		}
+	}
+
+	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)

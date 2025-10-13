@@ -109,7 +109,7 @@ func (r *MicroK8sControlPlaneReconciler) kubeconfigForCluster(ctx context.Contex
 			Namespace: cluster.Namespace,
 			Name:      cluster.Name + "-kubeconfig",
 			Labels: map[string]string{
-				clusterv1.ClusterLabelName: cluster.Name,
+				clusterv1.ClusterNameLabel: cluster.Name,
 			},
 		},
 		Data: map[string][]byte{
