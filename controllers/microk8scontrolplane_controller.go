@@ -36,7 +36,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 const requeueDuration = 30 * time.Second
@@ -203,14 +202,14 @@ func (r *MicroK8sControlPlaneReconciler) SetupWithManager(mgr ctrl.Manager, opti
 		For(&clusterv1beta1.MicroK8sControlPlane{}).
 		Owns(&clusterv1.Machine{}).
 		Watches(
-			&source.Kind{Type: &clusterv1.Cluster{}},
+			&clusterv1.Cluster{},
 			handler.EnqueueRequestsFromMapFunc(r.ClusterToMicroK8sControlPlane),
 		).
 		WithOptions(options).
 		Complete(r)
 }
 
-func (r *MicroK8sControlPlaneReconciler) ClusterToMicroK8sControlPlane(o client.Object) []ctrl.Request {
+func (r *MicroK8sControlPlaneReconciler) ClusterToMicroK8sControlPlane(ctx context.Context, o client.Object) []ctrl.Request {
 	c, ok := o.(*clusterv1.Cluster)
 	if !ok {
 		fmt.Printf("expected a Cluster but got a %T\n", o)
@@ -227,8 +226,8 @@ func (r *MicroK8sControlPlaneReconciler) ClusterToMicroK8sControlPlane(o client.
 
 func (r *MicroK8sControlPlaneReconciler) getControlPlaneMachinesForCluster(ctx context.Context, cluster client.ObjectKey, cpName string) ([]clusterv1.Machine, error) {
 	selector := map[string]string{
-		clusterv1.ClusterLabelName:             cluster.Name,
-		clusterv1.MachineControlPlaneLabelName: "",
+		clusterv1.ClusterNameLabel:             cluster.Name,
+		clusterv1.MachineControlPlaneNameLabel: "",
 	}
 
 	machineList := clusterv1.MachineList{}

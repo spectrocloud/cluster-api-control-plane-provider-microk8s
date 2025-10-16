@@ -9,17 +9,13 @@ import (
 	"strings"
 	"time"
 
-	clusterv1beta1 "github.com/canonical/cluster-api-control-plane-provider-microk8s/api/v1beta1"
-	"github.com/canonical/cluster-api-control-plane-provider-microk8s/pkg/clusteragent"
-	"github.com/canonical/cluster-api-control-plane-provider-microk8s/pkg/images"
-	"github.com/canonical/cluster-api-control-plane-provider-microk8s/pkg/token"
 	"github.com/go-logr/logr"
-	"golang.org/x/mod/semver"
-
 	"github.com/pkg/errors"
+	"golang.org/x/mod/semver"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -33,6 +29,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	clusterv1beta1 "github.com/canonical/cluster-api-control-plane-provider-microk8s/api/v1beta1"
+	"github.com/canonical/cluster-api-control-plane-provider-microk8s/pkg/clusteragent"
+	"github.com/canonical/cluster-api-control-plane-provider-microk8s/pkg/images"
+	"github.com/canonical/cluster-api-control-plane-provider-microk8s/pkg/token"
 )
 
 const (
@@ -331,7 +332,8 @@ func (r *MicroK8sControlPlaneReconciler) reconcileMachines(ctx context.Context, 
 }
 
 func (r *MicroK8sControlPlaneReconciler) reconcileExternalReference(ctx context.Context, ref corev1.ObjectReference, cluster *clusterv1.Cluster) error {
-	obj, err := external.Get(ctx, r.Client, &ref, cluster.Namespace)
+	ref.Namespace = cluster.Namespace
+	obj, err := external.Get(ctx, r.Client, &ref)
 	if err != nil {
 		return err
 	}
@@ -362,17 +364,7 @@ func (r *MicroK8sControlPlaneReconciler) bootControlPlane(ctx context.Context, c
 	}
 
 	// Clone the infrastructure template
-	infraRef, err := external.CloneTemplate(ctx, &external.CloneTemplateInput{
-		Client:      r.Client,
-		TemplateRef: &mcp.Spec.InfrastructureTemplate,
-		Namespace:   mcp.Namespace,
-		OwnerRef:    infraCloneOwner,
-		ClusterName: cluster.Name,
-		Labels: map[string]string{
-			clusterv1.ClusterLabelName:             cluster.Name,
-			clusterv1.MachineControlPlaneLabelName: "",
-		},
-	})
+	infraRef, err := r.cloneInfrastructureTemplate(ctx, cluster, mcp, infraCloneOwner)
 	if err != nil {
 		conditions.MarkFalse(mcp, clusterv1beta1.MachinesCreatedCondition,
 			clusterv1beta1.InfrastructureTemplateCloningFailedReason,
@@ -398,8 +390,8 @@ func (r *MicroK8sControlPlaneReconciler) bootControlPlane(ctx context.Context, c
 			Name:      names.SimpleNameGenerator.GenerateName(mcp.Name + "-"),
 			Namespace: mcp.Namespace,
 			Labels: map[string]string{
-				clusterv1.ClusterLabelName:             cluster.Name,
-				clusterv1.MachineControlPlaneLabelName: "",
+				clusterv1.ClusterNameLabel:             cluster.Name,
+				clusterv1.MachineControlPlaneNameLabel: "",
 			},
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(mcp, clusterv1beta1.GroupVersion.WithKind("MicroK8sControlPlane")),
@@ -822,4 +814,58 @@ func isMachineUpgraded(m clusterv1.Machine, newVersion string) bool {
 	machineVersion := semver.MajorMinor(*m.Spec.Version)
 	newVersion = semver.MajorMinor(newVersion) // just being extra careful
 	return semver.Compare(machineVersion, newVersion) == 0
+}
+
+func (r *MicroK8sControlPlaneReconciler) cloneInfrastructureTemplate(ctx context.Context, cluster *clusterv1.Cluster, mcp *clusterv1beta1.MicroK8sControlPlane, owner *metav1.OwnerReference) (*corev1.ObjectReference, error) {
+	templateRef := &mcp.Spec.InfrastructureTemplate
+
+	template := &unstructured.Unstructured{}
+	template.SetAPIVersion(templateRef.APIVersion)
+	template.SetKind(templateRef.Kind)
+	if err := r.Client.Get(ctx, client.ObjectKey{Namespace: mcp.Namespace, Name: templateRef.Name}, template); err != nil {
+		return nil, errors.Wrapf(err, "failed to get infrastructure template %s", templateRef.Name)
+	}
+
+	// Get the unstructured template from the template's spec
+	templateSpec, found, err := unstructured.NestedMap(template.Object, "spec", "template")
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get unstructured template spec")
+	}
+	if !found {
+		return nil, errors.New("spec.template not found in infrastructure template")
+	}
+
+	clone := &unstructured.Unstructured{Object: templateSpec}
+
+	// Set the APIVersion and Kind for the clone.
+	clone.SetAPIVersion(templateRef.APIVersion)
+	clone.SetKind(strings.TrimSuffix(templateRef.Kind, "Template"))
+
+	clone.SetName(names.SimpleNameGenerator.GenerateName(mcp.Name + "-"))
+	clone.SetNamespace(mcp.Namespace)
+
+	// Set owner reference.
+	clone.SetOwnerReferences([]metav1.OwnerReference{*owner})
+
+	// Add cluster labels.
+	labels := clone.GetLabels()
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+	labels[clusterv1.ClusterNameLabel] = cluster.Name
+	labels[clusterv1.MachineControlPlaneNameLabel] = ""
+	clone.SetLabels(labels)
+
+	if err := r.Client.Create(ctx, clone); err != nil {
+		return nil, errors.Wrap(err, "failed to create infrastructure clone")
+	}
+
+	infraRef := &corev1.ObjectReference{
+		APIVersion: clone.GetAPIVersion(),
+		Kind:       clone.GetKind(),
+		Name:       clone.GetName(),
+		Namespace:  clone.GetNamespace(),
+	}
+
+	return infraRef, nil
 }
