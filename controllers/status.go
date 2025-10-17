@@ -20,8 +20,8 @@ import (
 func (r *MicroK8sControlPlaneReconciler) updateStatus(ctx context.Context, mcp *clusterv1beta1.MicroK8sControlPlane, cluster *clusterv1.Cluster) error {
 	clusterSelector := &metav1.LabelSelector{
 		MatchLabels: map[string]string{
-			clusterv1.ClusterNameLabel:             cluster.Name,
-			clusterv1.MachineControlPlaneNameLabel: "",
+			clusterv1.ClusterNameLabel:         cluster.Name,
+			clusterv1.MachineControlPlaneLabel: "",
 		},
 	}
 
