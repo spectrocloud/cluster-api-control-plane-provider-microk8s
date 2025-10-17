@@ -390,8 +390,8 @@ func (r *MicroK8sControlPlaneReconciler) bootControlPlane(ctx context.Context, c
 			Name:      names.SimpleNameGenerator.GenerateName(mcp.Name + "-"),
 			Namespace: mcp.Namespace,
 			Labels: map[string]string{
-				clusterv1.ClusterNameLabel:             cluster.Name,
-				clusterv1.MachineControlPlaneNameLabel: "",
+				clusterv1.ClusterNameLabel:         cluster.Name,
+				clusterv1.MachineControlPlaneLabel: "",
 			},
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(mcp, clusterv1beta1.GroupVersion.WithKind("MicroK8sControlPlane")),
@@ -853,7 +853,7 @@ func (r *MicroK8sControlPlaneReconciler) cloneInfrastructureTemplate(ctx context
 		labels = make(map[string]string)
 	}
 	labels[clusterv1.ClusterNameLabel] = cluster.Name
-	labels[clusterv1.MachineControlPlaneNameLabel] = ""
+	labels[clusterv1.MachineControlPlaneLabel] = ""
 	clone.SetLabels(labels)
 
 	if err := r.Client.Create(ctx, clone); err != nil {

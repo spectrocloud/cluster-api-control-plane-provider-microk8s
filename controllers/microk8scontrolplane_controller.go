@@ -226,8 +226,8 @@ func (r *MicroK8sControlPlaneReconciler) ClusterToMicroK8sControlPlane(ctx conte
 
 func (r *MicroK8sControlPlaneReconciler) getControlPlaneMachinesForCluster(ctx context.Context, cluster client.ObjectKey, cpName string) ([]clusterv1.Machine, error) {
 	selector := map[string]string{
-		clusterv1.ClusterNameLabel:             cluster.Name,
-		clusterv1.MachineControlPlaneNameLabel: "",
+		clusterv1.ClusterNameLabel:         cluster.Name,
+		clusterv1.MachineControlPlaneLabel: "",
 	}
 
 	machineList := clusterv1.MachineList{}
