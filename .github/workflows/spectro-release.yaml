@@ -62,7 +62,7 @@ jobs:
         name: Build Image
         env:
           REGISTRY: ${{ env.LEGACY_REGISTRY }}
-          GO_VERSION: 1.26.5
+          GO_VERSION: 1.26.6
           BUILDER_GOLANG_VERSION: 1.26.5
         run: |
           make docker-build-all
@@ -73,7 +73,7 @@ jobs:
           FIPS_ENABLE: yes
           REGISTRY: ${{ env.FIPS_REGISTRY }}
           ALL_ARCH: amd64
-          GO_VERSION: 1.26.5
+          GO_VERSION: 1.26.6
           BUILDER_GOLANG_VERSION: 1.26.5
         run: |
           make docker-build-all
